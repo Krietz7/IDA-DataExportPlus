@@ -236,6 +236,10 @@ Export Plus: Export Data
             try:
                 self.export_address = self.GetControlValue(self._address)
                 self.export_address_len = self.GetControlValue(self._length)
+
+                self.min_ea = ida_ida.inf_get_min_ea()
+                self.max_ea = ida_ida.inf_get_max_ea()
+
                 if(self.min_ea < self.export_address and self.max_ea > self.export_address and self.max_ea > self.export_address + self.export_address_len):
                     self.Data_bytes,data_str =self.GetEAData(self.export_address,self.export_address_len)
                     self.SetControlValue(self._select_data,data_str)
@@ -247,6 +251,10 @@ Export Plus: Export Data
             try:
                 self.export_address = self.GetControlValue(self._address)
                 self.export_address_len = self.GetControlValue(self._length)
+                
+                self.min_ea = ida_ida.inf_get_min_ea()
+                self.max_ea = ida_ida.inf_get_max_ea()
+
                 if(self.min_ea < self.export_address and self.max_ea > self.export_address and self.max_ea > self.export_address + self.export_address_len):
                     self.Data_bytes,data_str =self.GetEAData(self.export_address,self.export_address_len)
                     self.SetControlValue(self._select_data,data_str)
@@ -465,18 +473,18 @@ class DataExportPlus(idaapi.plugin_t):
                 if(k == -1 or k == 0):
                     form.Free()
                     return 1
-            # try:
-            if(form.export_data_type_key == 6):
-                with open(form.export_file_path, "wb") as file_handle:
-                    file_handle.write(form.Data_bytes)
-            else:
-                with open(form.export_file_path, "w") as file_handle:
-                    file_handle.write(form.export_data)
+            try:
+                if(form.export_data_type_key == 6):
+                    with open(form.export_file_path, "wb") as file_handle:
+                        file_handle.write(form.Data_bytes)
+                else:
+                    with open(form.export_file_path, "w") as file_handle:
+                        file_handle.write(form.export_data)
 
-            print("Stored export results in",form.export_file_path)
+                print("Stored export results in",form.export_file_path)
 
-            # except:
-            #     idc.warning("Export file failed")
+            except:
+                idc.warning("Export file failed")
 
         form.Free()
         return 1
