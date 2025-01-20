@@ -9,5 +9,12 @@ Copy `DataExportPlus.py` to IDA plugins directory. Requires IDA Pro version 7.6 
 ## Usage
 Use hotkey `Shift+E` to Call out the plugin window
 
+![](img/image1.png)
 
+You can change the format of the exported data in this window
 
+![](img/image2.png)
+
+Exporting assembly code
+
+![](img/image3.png)
