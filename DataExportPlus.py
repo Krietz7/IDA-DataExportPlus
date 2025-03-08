@@ -1,6 +1,7 @@
 import idaapi
 import ida_ida
 import ida_kernwin
+import ida_bytes
 import idc
 
 import os
@@ -179,6 +180,17 @@ class DEP_Form(idaapi.Form):
         self.export_file_path = os.getcwd() + "\\export_results.txt"
 
 
+        data_type_flag = ida_bytes.get_flags(self.export_address)
+        checks = [
+            (idc.is_byte, 0),
+            (idc.is_word, 1),
+            (idc.is_dword, 2),
+            (idc.is_qword, 3),
+            (idc.is_strlit, 4),
+            (idc.is_code, 5)
+        ]
+        self.export_data_type_key = next((key for func, key in checks if func(data_type_flag)), 0)
+
         super(DEP_Form, self).__init__(
 
             r'''STARTITEM 0
@@ -209,7 +221,7 @@ Export Plus: Export Data
                 "_address": self.NumericInput(value = self.export_address, tp=self.FT_ADDR, swidth=30),
                 "_length": self.NumericInput(value = self.export_address_len, swidth = 30),
                 "_select_data": self.StringInput(value = "",swidth = 30),                
-                "_data_type": self.DropdownListControl(items = list(self.Data_type_list.keys())),
+                "_data_type": self.DropdownListControl(items = list(self.Data_type_list.keys()),selval = self.export_data_type_key),
                 "_export_type": self.DropdownListControl(items =list(self.Data_exported_format_list.keys())),
 
                 "_endianness": self.DropdownListControl(items = ["Little-endian","Big-endian"]),
@@ -231,8 +243,6 @@ Export Plus: Export Data
         data_str = ""
         if(fid == -1):
             self.EnableField(self._select_data,False)
-            self.ShowField(self._endianness,False)
-            self.ShowField(self._keep_comments,False)
             try:
                 self.export_address = self.GetControlValue(self._address)
                 self.export_address_len = self.GetControlValue(self._length)
@@ -262,7 +272,7 @@ Export Plus: Export Data
                 return 1
         
         # change export format or export type
-        elif(fid == self._data_type.id or fid == self._export_type.id): 
+        if(fid in [-1, self._data_type.id, self._export_type.id]): 
             self.export_data_type_key = self.GetControlValue(self._data_type)
             self.export_type_key = self.GetControlValue(self._export_type)
             
