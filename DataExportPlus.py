@@ -1,11 +1,10 @@
+import os
+
+import idc
 import idaapi
 import ida_ida
-import ida_kernwin
-import ida_bytes
-import idc
-
-import os
-import sys
+from ida_kernwin import add_hotkey
+from ida_bytes import get_flags
 
 class DEP_Conversion():
 
@@ -15,7 +14,7 @@ class DEP_Conversion():
         Data_type_list = {"Byte":1,"Word":2,"Dword":3,"Qword":4,"String literal":5,"Assembly Code":6,"Raw bytes":7}
         Data_exported_format_list = {"String":0,"C variable":1,"Python variable":2}
         return (Data_base_list,Data_type_list,Data_exported_format_list)
-    
+
     # data(bytes) big_endian(Bool) data_type(int) base(int) delimiter(str) prefix(str) suffix(str)
     def __init__(self,address, data_bytes, data_type_key = 1, export_type_key = 0,big_endian = False, base_key = 0, delimiter = " ",prefix = "",suffix = "",keep_comments = False):
         self.address = address
@@ -60,34 +59,31 @@ class DEP_Conversion():
         elif(self.type == "Raw bytes"):
             return "Cannot preview binary data"
 
-
-
         # String
         if(self.export_type_key == 0):
             return output
-        
+
         # C variable
         elif(self.export_type_key == 1):
             if(self.type in ['Byte','Word','Dword','Qword']):
                 C_type = {"Byte":"unsigned char","Word":"unsigned short","Dword":"unsigned int","Qword":"unsigned long long int"}[self.type]
                 return C_type+" IDA_"+ hex(self.address)[2:] + "[] = {" + output + "};"
-            
 
             elif(self.type == "String literal"):
-                return "unsigned char IDA_"+ hex(self.address)[2:] + "[] = \"" + output + "\";" 
+                return "unsigned char IDA_"+ hex(self.address)[2:] + "[] = \"" + output + "\";"
 
             elif(self.type == "Assembly Code"):
                 output = '\\n\"\n\"'.join([line for line in output.splitlines()])[:-1]
-                return "std:string IDA_"+ hex(self.address)[2:] + " = \"" + output + "\";" 
+                return "std:string IDA_"+ hex(self.address)[2:] + " = \"" + output + "\";"
 
             return None
-        
+
 
         # Python variable
         elif(self.export_type_key == 2):
             if(self.type in ['Byte','Word','Dword','Qword']):
                 return "IDA_" + hex(self.address)[2:] + " = [" +output + "]"
-            
+
             elif(self.type == "String literal"):
                 return "IDA_" + hex(self.address)[2:] + " = b\'" + output + '\''
 
@@ -109,8 +105,8 @@ class DEP_Conversion():
         if(result == ''):
             return "0"
         return result
-        
-    # base on Byte/Word/Dword/Qword convert byte stream to number 
+
+    # base on Byte/Word/Dword/Qword convert byte stream to number
     # parameter: base big_endian prefix suffix
     def NumberConversion(self):
         Number_array = []
@@ -125,7 +121,7 @@ class DEP_Conversion():
         if(self.base > 0 and self.base < 36):
             return self.delimiter.join("{0}{1}{2}".format(self.prefix,str(self.convert_base(i,self.base)),self.suffix) for i in Number_array)
         return None
-        
+
     def StringLiteralConversion(self):
         return str(self.data_bytes)[2:-1]
 
@@ -147,8 +143,6 @@ class DEP_Conversion():
         return output
 
 
-
-
 class DEP_Form(idaapi.Form):
     # idaapi information
     min_ea = ida_ida.inf_get_min_ea()
@@ -156,9 +150,6 @@ class DEP_Form(idaapi.Form):
 
     # list
     Data_base_list,Data_type_list,Data_exported_format_list = DEP_Conversion.get_list()
-
-
-
 
     def __init__(self,select_addr,select_len):
         self.export_address = select_addr
@@ -180,7 +171,7 @@ class DEP_Form(idaapi.Form):
         self.export_file_path = os.getcwd() + "\\export_results.txt"
 
 
-        data_type_flag = ida_bytes.get_flags(self.export_address)
+        data_type_flag = get_flags(self.export_address)
         checks = [
             (idc.is_byte, 0),
             (idc.is_word, 1),
@@ -255,13 +246,13 @@ Export Plus: Export Data
                     self.SetControlValue(self._select_data,data_str)
             except:
                 return 1
-            
+
         # change Selected infomation
         elif(fid == self._address.id or fid == self._length.id):
             try:
                 self.export_address = self.GetControlValue(self._address)
                 self.export_address_len = self.GetControlValue(self._length)
-                
+
                 self.min_ea = ida_ida.inf_get_min_ea()
                 self.max_ea = ida_ida.inf_get_max_ea()
 
@@ -270,17 +261,16 @@ Export Plus: Export Data
                     self.SetControlValue(self._select_data,data_str)
             except:
                 return 1
-        
+
         # change export format or export type
-        if(fid in [-1, self._data_type.id, self._export_type.id]): 
+        if(fid in [-1, self._data_type.id, self._export_type.id]):
             self.export_data_type_key = self.GetControlValue(self._data_type)
             self.export_type_key = self.GetControlValue(self._export_type)
-            
 
             # change Form Controls property
 
             # Byte
-            if(self.export_data_type_key == 0): 
+            if(self.export_data_type_key == 0):
                 self.ShowField(self._export_type,True)
 
                 self.ShowField(self._endianness,False)
@@ -299,7 +289,7 @@ Export Plus: Export Data
 
 
             # Word,Dword,Qword
-            elif(self.export_data_type_key in [1,2,3]): 
+            elif(self.export_data_type_key in [1,2,3]):
                 self.ShowField(self._export_type,True)
 
                 self.ShowField(self._endianness,True)
@@ -315,7 +305,7 @@ Export Plus: Export Data
                     self.EnableField(self._delimiter,True)
                     self.EnableField(self._prefix,True)
                     self.EnableField(self._suffix,True)
- 
+
             # String literal
             elif(self.export_data_type_key == 4):
                 self.ShowField(self._export_type,True)
@@ -371,10 +361,9 @@ Export Plus: Export Data
                 self.EnableField(self._delimiter,False)
                 self.EnableField(self._prefix,False)
                 self.EnableField(self._suffix,False)
-                
-        
+
             # change default value
-            self.SetControlsDefaultValue()        
+            self.SetControlsDefaultValue()
 
 
 
@@ -390,7 +379,7 @@ Export Plus: Export Data
 
 
             if(fid == self._base.id):
-                self.SetControlsDefaultValue() 
+                self.SetControlsDefaultValue()
 
 
         elif(fid == self._export_file_path.id):
@@ -407,9 +396,7 @@ Export Plus: Export Data
 
     def GetEAData(self,address,length):
         data_byte = idc.get_bytes(address,length)
-        data_str = ""
-        for i in bytearray(data_byte):
-            data_str+= "%02X " % i
+        data_str = ' '.join([f"{i:02X}" for i in bytearray(data_byte)])
 
         return data_byte,data_str.strip()
 
@@ -421,32 +408,32 @@ Export Plus: Export Data
 
 
     def SetControlsDefaultValue(self):
-            if(self.export_data_type_key in [0,1,2,3]): 
-                
-                Prefix_list = {0:"0x",1:"",2:"0o",3:"0b"}
-                self.export_prefix = Prefix_list[self.export_base_key]
-                self.SetControlValue(self._prefix,self.export_prefix)
+        if(self.export_data_type_key in [0,1,2,3]):
 
-                if(self.export_type_key == 1):
-                    self.export_delimiter = ", "
-                    self.SetControlValue(self._delimiter,", ")
-                    self.export_suffix = ""
-                    self.SetControlValue(self._suffix,"")
-                    # export as C array
-                    if(self.export_data_type_key == 3):
-                        self.export_suffix = "ULL"
-                        self.SetControlValue(self._suffix,"ULL")
-                    if(self.export_base_key == 2):
-                        self.export_prefix = "0"
-                        self.SetControlValue(self._prefix,self.export_prefix)
+            Prefix_list = {0:"0x",1:"",2:"0o",3:"0b"}
+            self.export_prefix = Prefix_list[self.export_base_key]
+            self.SetControlValue(self._prefix,self.export_prefix)
+
+            if(self.export_type_key == 1):
+                self.export_delimiter = ", "
+                self.SetControlValue(self._delimiter,", ")
+                self.export_suffix = ""
+                self.SetControlValue(self._suffix,"")
+                # export as C array
+                if(self.export_data_type_key == 3):
+                    self.export_suffix = "ULL"
+                    self.SetControlValue(self._suffix,"ULL")
+                if(self.export_base_key == 2):
+                    self.export_prefix = "0"
+                    self.SetControlValue(self._prefix,self.export_prefix)
 
 
-                if(self.export_type_key == 2):
-                    self.export_delimiter = ", "
-                    self.SetControlValue(self._delimiter,", ")
-                    self.export_suffix = ""
-                    self.SetControlValue(self._suffix,"")
-                    # export as Python array
+            if(self.export_type_key == 2):
+                self.export_delimiter = ", "
+                self.SetControlValue(self._delimiter,", ")
+                self.export_suffix = ""
+                self.SetControlValue(self._suffix,"")
+                # export as Python array
 
 
 
@@ -461,8 +448,8 @@ class DataExportPlus(idaapi.plugin_t):
         print("Start Data Export Plus plugin")
 
         idc.del_idc_hotkey("Shift+E")
-        ida_kernwin.add_hotkey("Shift-E", self.hotkeystart)
-        
+        add_hotkey("Shift-E", self.hotkeystart)
+
         return idaapi.PLUGIN_KEEP
 
     def term(self):
@@ -476,7 +463,7 @@ class DataExportPlus(idaapi.plugin_t):
         form = DEP_Form(ea_addr,ea_item_size)
         IsExport = form.Execute()
 
-        
+
         if(IsExport):
             if(os.path.exists(form.export_file_path)):
                 k = idc.ask_yn(1,"Export file already exists, Do you want to overwrite it?")
@@ -485,10 +472,10 @@ class DataExportPlus(idaapi.plugin_t):
                     return 1
             try:
                 if(form.export_data_type_key == 6):
-                    with open(form.export_file_path, "wb") as file_handle:
+                    with open(form.export_file_path, "wb", encoding="utf-8") as file_handle:
                         file_handle.write(form.Data_bytes)
                 else:
-                    with open(form.export_file_path, "w") as file_handle:
+                    with open(form.export_file_path, "w", encoding="utf-8") as file_handle:
                         file_handle.write(form.export_data)
 
                 print("Stored export results in",form.export_file_path)
@@ -506,9 +493,9 @@ class DataExportPlus(idaapi.plugin_t):
         if (selection):
             ea_item_size = ea_addr_end - ea_addr
         else:
-            ea_addr = idc.get_screen_ea();
+            ea_addr = idc.get_screen_ea()
             ea_item_size = idc.get_item_size(idc.get_screen_ea())
-        
+
         return ea_addr,ea_item_size
 
 
@@ -516,4 +503,3 @@ class DataExportPlus(idaapi.plugin_t):
 
 def PLUGIN_ENTRY():
     return DataExportPlus()
-
