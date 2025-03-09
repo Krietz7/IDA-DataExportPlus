@@ -480,7 +480,7 @@ class DataExportPlus(idaapi.plugin_t):
                     return 1
             try:
                 if(form.export_data_type_key == 6):
-                    with open(form.export_file_path, "wb", encoding="utf-8") as file_handle:
+                    with open(form.export_file_path, "wb") as file_handle:
                         file_handle.write(form.Data_bytes)
                 else:
                     with open(form.export_file_path, "w", encoding="utf-8") as file_handle:
