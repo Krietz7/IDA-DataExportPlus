@@ -132,6 +132,8 @@ class DEP_Conversion():
 
         output = ""
         i = assembly_code_start
+        if(assembly_code_start > ida_ida.inf_get_max_ea() or assembly_code_start < ida_ida.inf_get_min_ea()):
+            return ""
         while i < assembly_code_end:
             if(self.keep_comments):
                 output += idc.generate_disasm_line(i,0)
@@ -235,30 +237,36 @@ Export Plus: Export Data
         if(fid == -1):
             self.EnableField(self._select_data,False)
             try:
-                self.export_address = self.GetControlValue(self._address)
-                self.export_address_len = self.GetControlValue(self._length)
+                input_export_address = self.GetControlValue(self._address)
+                input_export_address_len = self.GetControlValue(self._length)
 
                 self.min_ea = ida_ida.inf_get_min_ea()
                 self.max_ea = ida_ida.inf_get_max_ea()
 
-                if(self.min_ea < self.export_address and self.max_ea > self.export_address and self.max_ea > self.export_address + self.export_address_len):
-                    self.Data_bytes,data_str =self.GetEAData(self.export_address,self.export_address_len)
+                if(self.min_ea < input_export_address and self.max_ea > input_export_address and self.max_ea > input_export_address + input_export_address_len):
+                    self.Data_bytes,data_str =self.GetEAData(input_export_address,input_export_address_len)
                     self.SetControlValue(self._select_data,data_str)
+
+                    self.export_address = input_export_address
+                    self.export_address_len = input_export_address_len
             except:
                 return 1
 
-        # change Selected infomation
+        # change Selected information
         elif(fid == self._address.id or fid == self._length.id):
             try:
-                self.export_address = self.GetControlValue(self._address)
-                self.export_address_len = self.GetControlValue(self._length)
-
+                input_export_address = self.GetControlValue(self._address)
+                input_export_address_len = self.GetControlValue(self._length)
+    
                 self.min_ea = ida_ida.inf_get_min_ea()
                 self.max_ea = ida_ida.inf_get_max_ea()
 
-                if(self.min_ea < self.export_address and self.max_ea > self.export_address and self.max_ea > self.export_address + self.export_address_len):
-                    self.Data_bytes,data_str =self.GetEAData(self.export_address,self.export_address_len)
+                if(self.min_ea < input_export_address and self.max_ea > input_export_address and self.max_ea > input_export_address + input_export_address_len):
+                    self.Data_bytes,data_str =self.GetEAData(input_export_address,input_export_address_len)
                     self.SetControlValue(self._select_data,data_str)
+
+                    self.export_address = input_export_address
+                    self.export_address_len = input_export_address_len
             except:
                 return 1
 
