@@ -1,4 +1,6 @@
 # IDA-DataExportPlus
+[中文](README.zh_CN.md)
+
 a IDA Pro plugin for exporting data, it can replace the IDA Pro original Data Export Window.
 
 The plugin supports export data base on different data type. Additional it also supports export assembly code.
