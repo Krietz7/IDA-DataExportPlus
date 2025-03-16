@@ -6,6 +6,8 @@ import ida_ida
 from ida_kernwin import add_hotkey
 from ida_bytes import get_flags
 
+VERSION = "1.0"
+
 class DEP_Conversion():
 
     @classmethod
@@ -450,6 +452,7 @@ class DataExportPlus(idaapi.plugin_t):
     comment = "Export Data"
     help = ""
     wanted_name = "Data Export Plus"
+    version = VERSION
 
     def init(self):
         print("=" * 80)
