@@ -6,7 +6,7 @@ import ida_ida
 from ida_kernwin import add_hotkey
 from ida_bytes import get_flags
 
-VERSION = "1.0"
+VERSION = "1.1"
 
 class DEP_Conversion():
 
@@ -18,7 +18,7 @@ class DEP_Conversion():
         return (Data_base_list,Data_type_list,Data_exported_format_list)
 
     # data(bytes) big_endian(Bool) data_type(int) base(int) delimiter(str) prefix(str) suffix(str)
-    def __init__(self,address, data_bytes, data_type_key = 1, export_type_key = 0,big_endian = False, base_key = 0, delimiter = " ",prefix = "",suffix = "",keep_comments = False):
+    def __init__(self,address, data_bytes, data_type_key = 1, export_type_key = 0,big_endian = False, base_key = 0, delimiter = " ",prefix = "",suffix = "",keep_comments = False, keep_names = False):
         self.address = address
         self.Data_base_list = self.get_list()[0]
         self.Data_type_list = self.get_list()[1]
@@ -31,6 +31,7 @@ class DEP_Conversion():
         self.prefix = prefix
         self.suffix = suffix
         self.keep_comments = keep_comments
+        self.keep_names = keep_names
 
     @classmethod
     def dict_key_to_list(self,dictionary):
@@ -137,6 +138,10 @@ class DEP_Conversion():
         if(assembly_code_start > ida_ida.inf_get_max_ea() or assembly_code_start < ida_ida.inf_get_min_ea()):
             return ""
         while i < assembly_code_end:
+            if(self.keep_names):
+                addr_name = idc.get_name(i)
+                if addr_name:
+                    output += "\n" + addr_name + ":\n"
             if(self.keep_comments):
                 output += idc.generate_disasm_line(i,0)
             else:
@@ -170,6 +175,7 @@ class DEP_Form(idaapi.Form):
         self.export_suffix = ""
         self.export_type_key = 0
         self.export_keep_comments = False
+        self.export_keep_names = False
 
         self.export_data = None
         self.export_file_path = os.getcwd() + "\\export_results.txt"
@@ -206,7 +212,8 @@ Export Plus: Export Data
             <##-   Prefix     :{_prefix}>
             <##-   Suffix     :{_suffix}>
 
-            <##-   KeepComments:{_keep_comments}>
+            <##-   Keep Comments:{_keep_comments}>
+            <##-   Keep Names   :{_keep_names}>
             <~Export Window~: {_export_text}>
             <Export File Path: {_export_file_path}>
             ''',
@@ -225,6 +232,8 @@ Export Plus: Export Data
                 "_prefix": self.StringInput(value = self.export_prefix,swidth = 30),
                 "_suffix": self.StringInput(value = self.export_suffix,swidth = 30),
                 "_keep_comments": self.DropdownListControl(items = ["False", "True"]),
+                "_keep_names": self.DropdownListControl(items = ["False", "True"]),
+
 
                 "_export_text": self.MultiLineTextControl(text = "",swidth = 48),
                 "_export_file_path": self.FileInput(value = self.export_file_path, save = True,swidth = 30),
@@ -289,6 +298,7 @@ Export Plus: Export Data
                 self.ShowField(self._prefix,True)
                 self.ShowField(self._suffix,True)
                 self.ShowField(self._keep_comments,False)
+                self.ShowField(self._keep_names,False)
 
 
                 # export as string
@@ -308,6 +318,7 @@ Export Plus: Export Data
                 self.ShowField(self._prefix,True)
                 self.ShowField(self._suffix,True)
                 self.ShowField(self._keep_comments,False)
+                self.ShowField(self._keep_names,False)
 
                 # export as string
                 if(self.export_type_key == 0):
@@ -326,6 +337,7 @@ Export Plus: Export Data
                 self.ShowField(self._prefix,False)
                 self.ShowField(self._suffix,False)
                 self.ShowField(self._keep_comments,False)
+                self.ShowField(self._keep_names,False)
 
             # Assembly Code
             elif(self.export_data_type_key == 5):
@@ -337,6 +349,7 @@ Export Plus: Export Data
                 self.ShowField(self._prefix,False)
                 self.ShowField(self._suffix,False)
                 self.ShowField(self._keep_comments,True)
+                self.ShowField(self._keep_names,True)
 
             # Raw bytes
             elif(self.export_data_type_key == 6):
@@ -348,6 +361,7 @@ Export Plus: Export Data
                 self.ShowField(self._prefix,False)
                 self.ShowField(self._suffix,False)
                 self.ShowField(self._keep_comments,False)
+                self.ShowField(self._keep_names,False)
 
 
 
@@ -379,13 +393,14 @@ Export Plus: Export Data
 
 
 
-        elif(fid in [self._endianness.id,self._base.id,self._delimiter.id,self._prefix.id,self._suffix.id,self._keep_comments.id]):
+        elif(fid in [self._endianness.id,self._base.id,self._delimiter.id,self._prefix.id,self._suffix.id,self._keep_comments.id,self._keep_names.id]):
             self.export_big_endian = self.GetControlValue(self._endianness)
             self.export_base_key = self.GetControlValue(self._base)
             self.export_delimiter = self.GetControlValue(self._delimiter)
             self.export_prefix = self.GetControlValue(self._prefix)
             self.export_suffix = self.GetControlValue(self._suffix)
             self.export_keep_comments = {0:False,1:True}[self.GetControlValue(self._keep_comments)]
+            self.export_keep_names = {0:False,1:True}[self.GetControlValue(self._keep_names)]
 
 
             if(fid == self._base.id):
@@ -412,7 +427,16 @@ Export Plus: Export Data
 
 
     def RefreshExportWindow(self):
-        t = DEP_Conversion(address = self.export_address, data_bytes = self.Data_bytes,data_type_key = self.export_data_type_key,export_type_key = self.export_type_key,big_endian = self.export_big_endian,base_key = self.export_base_key,delimiter = self.export_delimiter,prefix = self.export_prefix,suffix = self.export_suffix, keep_comments = self.export_keep_comments )
+        t = DEP_Conversion(address = self.export_address, data_bytes = self.Data_bytes,
+                           data_type_key = self.export_data_type_key,
+                           export_type_key = self.export_type_key,
+                           big_endian = self.export_big_endian,
+                           base_key = self.export_base_key,
+                           delimiter = self.export_delimiter,
+                           prefix = self.export_prefix,
+                           suffix = self.export_suffix, 
+                           keep_comments = self.export_keep_comments,
+                           keep_names = self.export_keep_names)
         self.export_data = t.activate()
         self.SetControlValue(self._export_text,  idaapi.textctrl_info_t(text = self.export_data, flags = 32, tabsize = 0))
 
