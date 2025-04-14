@@ -1,4 +1,4 @@
-import os
+from os import getcwd, path
 
 import idc
 import idaapi
@@ -6,7 +6,7 @@ import ida_ida
 from ida_kernwin import add_hotkey
 from ida_bytes import get_flags
 
-VERSION = "1.1"
+VERSION = "1.1.2"
 
 class DEP_Conversion():
 
@@ -18,10 +18,9 @@ class DEP_Conversion():
         return (Data_base_list,Data_type_list,Data_exported_format_list)
 
     # data(bytes) big_endian(Bool) data_type(int) base(int) delimiter(str) prefix(str) suffix(str)
-    def __init__(self,address, data_bytes, data_type_key = 1, export_type_key = 0,big_endian = False, base_key = 0, delimiter = " ",prefix = "",suffix = "",keep_comments = False, keep_names = False):
+    def __init__(self, address, data_bytes, data_type_key = 1, export_type_key = 0,big_endian = False, base_key = 0, delimiter = " ",prefix = "",suffix = "",keep_comments = False, keep_names = False):
         self.address = address
-        self.Data_base_list = self.get_list()[0]
-        self.Data_type_list = self.get_list()[1]
+        self.Data_base_list, self.Data_type_list, _ = self.get_list()
         self.data_bytes = data_bytes
         self.export_type_key = export_type_key
         self.big_endian = big_endian
@@ -59,6 +58,7 @@ class DEP_Conversion():
 
         elif(self.type == "Assembly Code"):
             output = self.AssemblyCodeConversion()
+
         elif(self.type == "Raw bytes"):
             return "Cannot preview binary data"
 
@@ -81,7 +81,6 @@ class DEP_Conversion():
 
             return None
 
-
         # Python variable
         elif(self.export_type_key == 2):
             if(self.type in ['Byte','Word','Dword','Qword']):
@@ -92,8 +91,6 @@ class DEP_Conversion():
 
             elif(self.type == "Assembly Code"):
                 return "IDA_" + hex(self.address)[2:] + " = \'\'\'" + output + '\'\'\''
-
-
 
         return None
 
@@ -178,7 +175,7 @@ class DEP_Form(idaapi.Form):
         self.export_keep_names = False
 
         self.export_data = None
-        self.export_file_path = os.getcwd() + "\\export_results.txt"
+        self.export_file_path = getcwd() + "\\export_results.txt"
 
 
         data_type_flag = get_flags(self.export_address)
@@ -300,13 +297,11 @@ Export Plus: Export Data
                 self.ShowField(self._keep_comments,False)
                 self.ShowField(self._keep_names,False)
 
-
                 # export as string
                 if(self.export_type_key == 0):
                     self.EnableField(self._delimiter,True)
                     self.EnableField(self._prefix,True)
                     self.EnableField(self._suffix,True)
-
 
             # Word,Dword,Qword
             elif(self.export_data_type_key in [1,2,3]):
@@ -363,12 +358,6 @@ Export Plus: Export Data
                 self.ShowField(self._keep_comments,False)
                 self.ShowField(self._keep_names,False)
 
-
-
-
-
-
-
             # export as string
             if(self.export_type_key == 0):
                 pass
@@ -378,7 +367,6 @@ Export Plus: Export Data
                 self.EnableField(self._delimiter,False)
                 self.EnableField(self._prefix,False)
                 self.EnableField(self._suffix,False)
-
 
             # export as Python varible
             elif(self.export_type_key == 2):
@@ -472,7 +460,7 @@ Export Plus: Export Data
 
 
 class DataExportPlus(idaapi.plugin_t):
-    flags = idaapi.PLUGIN_KEEP
+    flags = idaapi.PLUGIN_DRAW
     comment = "Export Data"
     help = ""
     wanted_name = "Data Export Plus"
@@ -485,7 +473,7 @@ class DataExportPlus(idaapi.plugin_t):
         idc.del_idc_hotkey("Shift+E")
         add_hotkey("Shift-E", self.hotkeystart)
 
-        return idaapi.PLUGIN_KEEP
+        return idaapi.PLUGIN_OK
 
     def term(self):
         return
@@ -500,7 +488,7 @@ class DataExportPlus(idaapi.plugin_t):
 
 
         if(IsExport):
-            if(os.path.exists(form.export_file_path)):
+            if(path.exists(form.export_file_path)):
                 k = idc.ask_yn(1,"Export file already exists, Do you want to overwrite it?")
                 if(k == -1 or k == 0):
                     form.Free()
