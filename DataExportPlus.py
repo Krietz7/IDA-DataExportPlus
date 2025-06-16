@@ -6,23 +6,72 @@ import ida_ida
 from ida_kernwin import add_hotkey
 from ida_bytes import get_flags
 
-VERSION = "1.1.2"
+VERSION = "1.1.3"
+
+
+# Notice: Since the selected value of IDA's self.DropdownListControl gets the index of the incoming List object, 
+# the constant definition of key values ​​also needs to follow the 0-index
+
+# Define constants for data base
+DATA_BASE_HEX_KEY = 0
+DATA_BASE_DEC_KEY = 1
+DATA_BASE_OCT_KEY = 2
+DATA_BASE_BIN_KEY = 3
+
+# Define constants for data types
+DATA_TYPE_BYTE_KEY = 0
+DATA_TYPE_WORD_KEY = 1
+DATA_TYPE_DWORD_KEY = 2
+DATA_TYPE_QWORD_KEY = 3
+DATA_TYPE_STRING_LITERAL_KEY = 4
+DATA_TYPE_ASSEMBLY_CODE_KEY = 5
+DATA_TYPE_RAW_BYTES_KEY = 6
+
+# Define constants for export formats
+EXPORT_FORMAT_STRING_KEY = 0
+EXPORT_FORMAT_C_VARIABLE_KEY = 1
+EXPORT_FORMAT_PYTHON_VARIABLE_KEY = 2
 
 class DEP_Conversion():
 
-    @classmethod
-    def get_list(self):
-        Data_base_list = {"Hexadecimal":16,"Decimal":10,"Octal":8,"Binary":2,}
-        Data_type_list = {"Byte":1,"Word":2,"Dword":3,"Qword":4,"String literal":5,"Assembly Code":6,"Raw bytes":7}
-        Data_exported_format_list = {"String":0,"C variable":1,"Python variable":2}
+    @staticmethod
+    def get_list():
+        Data_base_list = {
+            "Hexadecimal": DATA_BASE_HEX_KEY,
+            "Decimal": DATA_BASE_DEC_KEY,
+            "Octal": DATA_BASE_OCT_KEY,
+            "Binary": DATA_BASE_BIN_KEY,
+        }
+        Data_type_list = {
+            "Byte": DATA_TYPE_BYTE_KEY,
+            "Word": DATA_TYPE_WORD_KEY,
+            "Dword": DATA_TYPE_DWORD_KEY,
+            "Qword": DATA_TYPE_QWORD_KEY,
+            "String literal": DATA_TYPE_STRING_LITERAL_KEY,
+            "Assembly Code": DATA_TYPE_ASSEMBLY_CODE_KEY,
+            "Raw bytes": DATA_TYPE_RAW_BYTES_KEY,
+        }
+        Data_exported_format_list = {
+            "String": EXPORT_FORMAT_STRING_KEY,
+            "C variable": EXPORT_FORMAT_C_VARIABLE_KEY,
+            "Python variable": EXPORT_FORMAT_PYTHON_VARIABLE_KEY,
+        }
         return (Data_base_list,Data_type_list,Data_exported_format_list)
 
     # data(bytes) big_endian(Bool) data_type(int) base(int) delimiter(str) prefix(str) suffix(str)
-    def __init__(self, address, data_bytes, data_type_key = 1, export_type_key = 0,big_endian = False, base_key = 0, delimiter = " ",prefix = "",suffix = "",keep_comments = False, keep_names = False):
+    def __init__(self, address, 
+                 data_bytes, 
+                 data_type_key = DATA_TYPE_BYTE_KEY,
+                 export_as_type_key = EXPORT_FORMAT_STRING_KEY, 
+                 big_endian = False, 
+                 base_key = DATA_BASE_HEX_KEY, 
+                 delimiter = " ",prefix = "",suffix = "",
+                 keep_comments = False, 
+                 keep_names = False):
         self.address = address
         self.Data_base_list, self.Data_type_list, _ = self.get_list()
         self.data_bytes = data_bytes
-        self.export_type_key = export_type_key
+        self.export_as_type_key = export_as_type_key
         self.big_endian = big_endian
         self.base_key = base_key
         self.data_type_key = data_type_key 
@@ -32,64 +81,59 @@ class DEP_Conversion():
         self.keep_comments = keep_comments
         self.keep_names = keep_names
 
-    @classmethod
-    def dict_key_to_list(self,dictionary):
-        t = list(dictionary.items())
-        key = [i[0] for i in t]
-        return key
-
-    @classmethod
-    def dict_value_to_list(self,dictionary):
-        t = list(dictionary.items())
-        value = [i[1] for i in t]
-        return value
-
-
     def activate(self):
-        self.base = self.dict_value_to_list(self.Data_base_list)[self.base_key]
-        self.type = self.dict_key_to_list(self.Data_type_list)[self.data_type_key]
+        BaseList = {
+            DATA_BASE_HEX_KEY: 16,
+            DATA_BASE_DEC_KEY: 10,
+            DATA_BASE_OCT_KEY: 8,
+            DATA_BASE_BIN_KEY: 2,
+        }
+        self.base = BaseList[self.base_key]
 
         output = ""
-        if(self.type in ['Byte','Word','Dword','Qword']):
+        if(self.data_type_key in [DATA_TYPE_BYTE_KEY, DATA_TYPE_WORD_KEY, DATA_TYPE_DWORD_KEY, DATA_TYPE_QWORD_KEY]):
             output = self.NumberConversion()
 
-        elif(self.type == "String literal"):
+        elif(self.data_type_key == DATA_TYPE_STRING_LITERAL_KEY):
             output = self.StringLiteralConversion()
 
-        elif(self.type == "Assembly Code"):
+        elif(self.data_type_key == DATA_TYPE_ASSEMBLY_CODE_KEY):
             output = self.AssemblyCodeConversion()
 
-        elif(self.type == "Raw bytes"):
+        elif(self.data_type_key == DATA_TYPE_RAW_BYTES_KEY):
             return "Cannot preview binary data"
 
         # String
-        if(self.export_type_key == 0):
+        if(self.export_as_type_key == EXPORT_FORMAT_STRING_KEY):
             return output
 
         # C variable
-        elif(self.export_type_key == 1):
-            if(self.type in ['Byte','Word','Dword','Qword']):
-                C_type = {"Byte":"unsigned char","Word":"unsigned short","Dword":"unsigned int","Qword":"unsigned long long int"}[self.type]
+        elif(self.export_as_type_key == EXPORT_FORMAT_C_VARIABLE_KEY):
+            if(self.data_type_key in [DATA_TYPE_BYTE_KEY, DATA_TYPE_WORD_KEY, DATA_TYPE_DWORD_KEY, DATA_TYPE_QWORD_KEY]):
+                C_type = {DATA_TYPE_BYTE_KEY:"unsigned char",
+                               DATA_TYPE_WORD_KEY:"unsigned short",
+                               DATA_TYPE_DWORD_KEY:"unsigned int",
+                               DATA_TYPE_QWORD_KEY:"unsigned long long int"}[self.data_type_key]
                 return C_type+" IDA_"+ hex(self.address)[2:] + "[] = {" + output + "};"
 
-            elif(self.type == "String literal"):
+            elif(self.data_type_key == DATA_TYPE_STRING_LITERAL_KEY):
                 return "unsigned char IDA_"+ hex(self.address)[2:] + "[] = \"" + output + "\";"
 
-            elif(self.type == "Assembly Code"):
+            elif(self.data_type_key == DATA_TYPE_ASSEMBLY_CODE_KEY):
                 output = '\\n\"\n\"'.join([line for line in output.splitlines()])[:-1]
-                return "std:string IDA_"+ hex(self.address)[2:] + " = \"" + output + "\";"
+                return "const char* IDA_"+ hex(self.address)[2:] + " = \"" + output + "\";"
 
             return None
 
         # Python variable
-        elif(self.export_type_key == 2):
-            if(self.type in ['Byte','Word','Dword','Qword']):
+        elif(self.export_as_type_key == EXPORT_FORMAT_PYTHON_VARIABLE_KEY):
+            if(self.data_type_key in [DATA_TYPE_BYTE_KEY, DATA_TYPE_WORD_KEY, DATA_TYPE_DWORD_KEY, DATA_TYPE_QWORD_KEY]):
                 return "IDA_" + hex(self.address)[2:] + " = [" +output + "]"
 
-            elif(self.type == "String literal"):
+            elif(self.data_type_key == DATA_TYPE_STRING_LITERAL_KEY):
                 return "IDA_" + hex(self.address)[2:] + " = b\'" + output + '\''
 
-            elif(self.type == "Assembly Code"):
+            elif(self.data_type_key == DATA_TYPE_ASSEMBLY_CODE_KEY):
                 return "IDA_" + hex(self.address)[2:] + " = \'\'\'" + output + '\'\'\''
 
         return None
@@ -110,8 +154,8 @@ class DEP_Conversion():
     # parameter: base big_endian prefix suffix
     def NumberConversion(self):
         Number_array = []
-        type_len_list = {"Byte":1,"Word":2,"Dword":4,"Qword":8}
-        Number_len = type_len_list[self.type]
+        type_len_list = {DATA_TYPE_BYTE_KEY:1, DATA_TYPE_WORD_KEY:2, DATA_TYPE_DWORD_KEY:4, DATA_TYPE_QWORD_KEY:8}
+        Number_len = type_len_list[self.data_type_key]
         if(not self.big_endian):
             for i in range(0, len(self.data_bytes), Number_len):
                 Number_array.append(int.from_bytes(self.data_bytes[i:i+Number_len],byteorder='little'))
@@ -161,16 +205,16 @@ class DEP_Form(idaapi.Form):
         self.export_address = select_addr
         self.export_address_len = select_len
         self.Data_bytes = b""
-        self.export_data_type_key = 0
+        self.export_data_type_key = DATA_TYPE_BYTE_KEY
 
 
         # Format Options
         self.export_big_endian = False
-        self.export_base_key = 0
+        self.export_base_key = DATA_BASE_HEX_KEY
         self.export_delimiter = ","
         self.export_prefix = "0x"
         self.export_suffix = ""
-        self.export_type_key = 0
+        self.export_as_type_key = EXPORT_FORMAT_STRING_KEY
         self.export_keep_comments = False
         self.export_keep_names = False
 
@@ -180,14 +224,14 @@ class DEP_Form(idaapi.Form):
 
         data_type_flag = get_flags(self.export_address)
         checks = [
-            (idc.is_byte, 0),
-            (idc.is_word, 1),
-            (idc.is_dword, 2),
-            (idc.is_qword, 3),
-            (idc.is_strlit, 4),
-            (idc.is_code, 5)
+            (idc.is_byte, DATA_TYPE_BYTE_KEY),
+            (idc.is_word, DATA_TYPE_WORD_KEY),
+            (idc.is_dword, DATA_TYPE_DWORD_KEY),
+            (idc.is_qword, DATA_TYPE_QWORD_KEY),
+            (idc.is_strlit, DATA_TYPE_STRING_LITERAL_KEY),
+            (idc.is_code, DATA_TYPE_ASSEMBLY_CODE_KEY),
         ]
-        self.export_data_type_key = next((key for func, key in checks if func(data_type_flag)), 0)
+        self.export_data_type_key = next((key for func, key in checks if func(data_type_flag)), DATA_TYPE_BYTE_KEY)
 
         super(DEP_Form, self).__init__(
 
@@ -220,7 +264,7 @@ Export Plus: Export Data
                 "_address": self.NumericInput(value = self.export_address, tp=self.FT_ADDR, swidth=30),
                 "_length": self.NumericInput(value = self.export_address_len, swidth = 30),
                 "_select_data": self.StringInput(value = "",swidth = 30),                
-                "_data_type": self.DropdownListControl(items = list(self.Data_type_list.keys()),selval = self.export_data_type_key),
+                "_data_type": self.DropdownListControl(items = list(self.Data_type_list.keys()), selval = self.export_data_type_key),
                 "_export_type": self.DropdownListControl(items =list(self.Data_exported_format_list.keys())),
 
                 "_endianness": self.DropdownListControl(items = ["Little-endian","Big-endian"]),
@@ -281,12 +325,13 @@ Export Plus: Export Data
         # change export format or export type
         if(fid in [-1, self._data_type.id, self._export_type.id]):
             self.export_data_type_key = self.GetControlValue(self._data_type)
-            self.export_type_key = self.GetControlValue(self._export_type)
+            self.export_as_type_key = self.GetControlValue(self._export_type)
 
-            # change Form Controls property
+            ### change Form Controls property
 
+            ## control the visibility of fields
             # Byte
-            if(self.export_data_type_key == 0):
+            if(self.export_data_type_key == DATA_TYPE_BYTE_KEY):
                 self.ShowField(self._export_type,True)
 
                 self.ShowField(self._endianness,False)
@@ -298,13 +343,13 @@ Export Plus: Export Data
                 self.ShowField(self._keep_names,False)
 
                 # export as string
-                if(self.export_type_key == 0):
+                if(self.export_as_type_key == EXPORT_FORMAT_STRING_KEY):
                     self.EnableField(self._delimiter,True)
                     self.EnableField(self._prefix,True)
                     self.EnableField(self._suffix,True)
 
             # Word,Dword,Qword
-            elif(self.export_data_type_key in [1,2,3]):
+            elif(self.export_data_type_key in [DATA_TYPE_WORD_KEY, DATA_TYPE_DWORD_KEY, DATA_TYPE_QWORD_KEY]):
                 self.ShowField(self._export_type,True)
 
                 self.ShowField(self._endianness,True)
@@ -316,14 +361,14 @@ Export Plus: Export Data
                 self.ShowField(self._keep_names,False)
 
                 # export as string
-                if(self.export_type_key == 0):
+                if(self.export_as_type_key == EXPORT_FORMAT_STRING_KEY):
                     self.EnableField(self._endianness,True)
                     self.EnableField(self._delimiter,True)
                     self.EnableField(self._prefix,True)
                     self.EnableField(self._suffix,True)
 
             # String literal
-            elif(self.export_data_type_key == 4):
+            elif(self.export_data_type_key == DATA_TYPE_STRING_LITERAL_KEY):
                 self.ShowField(self._export_type,True)
 
                 self.ShowField(self._endianness,False)
@@ -335,7 +380,7 @@ Export Plus: Export Data
                 self.ShowField(self._keep_names,False)
 
             # Assembly Code
-            elif(self.export_data_type_key == 5):
+            elif(self.export_data_type_key == DATA_TYPE_ASSEMBLY_CODE_KEY):
                 self.ShowField(self._export_type,True)
 
                 self.ShowField(self._endianness,False)
@@ -347,7 +392,7 @@ Export Plus: Export Data
                 self.ShowField(self._keep_names,True)
 
             # Raw bytes
-            elif(self.export_data_type_key == 6):
+            elif(self.export_data_type_key == DATA_TYPE_RAW_BYTES_KEY):
                 self.ShowField(self._export_type,False)
 
                 self.ShowField(self._endianness,False)
@@ -358,18 +403,22 @@ Export Plus: Export Data
                 self.ShowField(self._keep_comments,False)
                 self.ShowField(self._keep_names,False)
 
+            ## control the availability of fields
             # export as string
-            if(self.export_type_key == 0):
-                pass
+            if(self.export_as_type_key == EXPORT_FORMAT_STRING_KEY):
+                self.EnableField(self._endianness,True)
+                self.EnableField(self._delimiter,True)
+                self.EnableField(self._prefix,True)
+                self.EnableField(self._suffix,True)
 
             # export as C varible
-            elif(self.export_type_key == 1):
+            elif(self.export_as_type_key == EXPORT_FORMAT_C_VARIABLE_KEY):
                 self.EnableField(self._delimiter,False)
                 self.EnableField(self._prefix,False)
                 self.EnableField(self._suffix,False)
 
             # export as Python varible
-            elif(self.export_type_key == 2):
+            elif(self.export_as_type_key == EXPORT_FORMAT_PYTHON_VARIABLE_KEY):
                 self.EnableField(self._delimiter,False)
                 self.EnableField(self._prefix,False)
                 self.EnableField(self._suffix,False)
@@ -398,9 +447,6 @@ Export Plus: Export Data
         elif(fid == self._export_file_path.id):
             self.export_file_path = self.GetControlValue(self._export_file_path)
 
-
-
-
         # refresh MultiLineTextControl
         self.RefreshExportWindow()
 
@@ -415,9 +461,10 @@ Export Plus: Export Data
 
 
     def RefreshExportWindow(self):
-        t = DEP_Conversion(address = self.export_address, data_bytes = self.Data_bytes,
+        t = DEP_Conversion(address = self.export_address, 
+                           data_bytes = self.Data_bytes,
                            data_type_key = self.export_data_type_key,
-                           export_type_key = self.export_type_key,
+                           export_as_type_key = self.export_as_type_key,
                            big_endian = self.export_big_endian,
                            base_key = self.export_base_key,
                            delimiter = self.export_delimiter,
@@ -430,32 +477,36 @@ Export Plus: Export Data
 
 
     def SetControlsDefaultValue(self):
-        if(self.export_data_type_key in [0,1,2,3]):
+        if(self.export_data_type_key in [DATA_TYPE_BYTE_KEY, DATA_TYPE_WORD_KEY, DATA_TYPE_DWORD_KEY, DATA_TYPE_QWORD_KEY]):
 
-            Prefix_list = {0:"0x",1:"",2:"0o",3:"0b"}
+            Prefix_list = {DATA_BASE_HEX_KEY:"0x", DATA_BASE_DEC_KEY:"", DATA_BASE_OCT_KEY:"0o", DATA_BASE_BIN_KEY:"0b"}
             self.export_prefix = Prefix_list[self.export_base_key]
             self.SetControlValue(self._prefix,self.export_prefix)
 
-            if(self.export_type_key == 1):
+            if(self.export_as_type_key == EXPORT_FORMAT_C_VARIABLE_KEY):
+                # export as C array
                 self.export_delimiter = ", "
                 self.SetControlValue(self._delimiter,", ")
                 self.export_suffix = ""
                 self.SetControlValue(self._suffix,"")
-                # export as C array
-                if(self.export_data_type_key == 3):
+
+                # add "unsigned long long" suffix for 64bit c data
+                if(self.export_data_type_key == DATA_TYPE_QWORD_KEY):
                     self.export_suffix = "ULL"
                     self.SetControlValue(self._suffix,"ULL")
-                if(self.export_base_key == 2):
+
+                # oct prefix in c data
+                if(self.export_base_key == DATA_BASE_OCT_KEY):
                     self.export_prefix = "0"
                     self.SetControlValue(self._prefix,self.export_prefix)
 
 
-            if(self.export_type_key == 2):
+            if(self.export_as_type_key == EXPORT_FORMAT_PYTHON_VARIABLE_KEY):
+                # export as Python array
                 self.export_delimiter = ", "
                 self.SetControlValue(self._delimiter,", ")
                 self.export_suffix = ""
                 self.SetControlValue(self._suffix,"")
-                # export as Python array
 
 
 
