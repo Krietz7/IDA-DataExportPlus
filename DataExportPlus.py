@@ -1,4 +1,5 @@
 from os import getcwd, path
+from struct import unpack
 
 import idc
 import idaapi
@@ -6,7 +7,7 @@ import ida_ida
 from ida_kernwin import add_hotkey
 from ida_bytes import get_flags
 
-VERSION = "1.1.3"
+VERSION = "1.2.0"
 
 
 # Notice: Since the selected value of IDA's self.DropdownListControl gets the index of the incoming List object, 
@@ -23,9 +24,11 @@ DATA_TYPE_BYTE_KEY = 0
 DATA_TYPE_WORD_KEY = 1
 DATA_TYPE_DWORD_KEY = 2
 DATA_TYPE_QWORD_KEY = 3
-DATA_TYPE_STRING_LITERAL_KEY = 4
-DATA_TYPE_ASSEMBLY_CODE_KEY = 5
-DATA_TYPE_RAW_BYTES_KEY = 6
+DATA_TYPE_FLOAT_KEY = 4
+DATA_TYPE_DOUBLE_KEY = 5
+DATA_TYPE_STRING_LITERAL_KEY = 6
+DATA_TYPE_ASSEMBLY_CODE_KEY = 7
+DATA_TYPE_RAW_BYTES_KEY = 8
 
 # Define constants for export formats
 EXPORT_FORMAT_STRING_KEY = 0
@@ -47,6 +50,8 @@ class DEP_Conversion():
             "Word": DATA_TYPE_WORD_KEY,
             "Dword": DATA_TYPE_DWORD_KEY,
             "Qword": DATA_TYPE_QWORD_KEY,
+            "Float": DATA_TYPE_FLOAT_KEY,
+            "Double": DATA_TYPE_DOUBLE_KEY,
             "String literal": DATA_TYPE_STRING_LITERAL_KEY,
             "Assembly Code": DATA_TYPE_ASSEMBLY_CODE_KEY,
             "Raw bytes": DATA_TYPE_RAW_BYTES_KEY,
@@ -94,11 +99,15 @@ class DEP_Conversion():
         if(self.data_type_key in [DATA_TYPE_BYTE_KEY, DATA_TYPE_WORD_KEY, DATA_TYPE_DWORD_KEY, DATA_TYPE_QWORD_KEY]):
             output = self.NumberConversion()
 
+        elif(self.data_type_key in [DATA_TYPE_FLOAT_KEY, DATA_TYPE_DOUBLE_KEY]):
+            output = self.FloatConversion()
+
         elif(self.data_type_key == DATA_TYPE_STRING_LITERAL_KEY):
             output = self.StringLiteralConversion()
 
         elif(self.data_type_key == DATA_TYPE_ASSEMBLY_CODE_KEY):
             output = self.AssemblyCodeConversion()
+
 
         elif(self.data_type_key == DATA_TYPE_RAW_BYTES_KEY):
             return "Cannot preview binary data"
@@ -116,6 +125,12 @@ class DEP_Conversion():
                                DATA_TYPE_QWORD_KEY:"unsigned long long int"}[self.data_type_key]
                 return C_type+" IDA_"+ hex(self.address)[2:] + "[] = {" + output + "};"
 
+            elif(self.data_type_key in [DATA_TYPE_FLOAT_KEY, DATA_TYPE_DOUBLE_KEY]):
+                C_type = {DATA_TYPE_FLOAT_KEY:"float",
+                               DATA_TYPE_DOUBLE_KEY:"double"}[self.data_type_key]
+                output = output.replace("nan", "NAN")
+                return C_type+" IDA_"+ hex(self.address)[2:] + "[] = {" + output + "};"
+
             elif(self.data_type_key == DATA_TYPE_STRING_LITERAL_KEY):
                 return "unsigned char IDA_"+ hex(self.address)[2:] + "[] = \"" + output + "\";"
 
@@ -129,6 +144,10 @@ class DEP_Conversion():
         elif(self.export_as_type_key == EXPORT_FORMAT_PYTHON_VARIABLE_KEY):
             if(self.data_type_key in [DATA_TYPE_BYTE_KEY, DATA_TYPE_WORD_KEY, DATA_TYPE_DWORD_KEY, DATA_TYPE_QWORD_KEY]):
                 return "IDA_" + hex(self.address)[2:] + " = [" +output + "]"
+
+            elif(self.data_type_key in [DATA_TYPE_FLOAT_KEY, DATA_TYPE_DOUBLE_KEY]):
+                output = output.replace("nan", "float('nan')")
+                return "IDA_" + hex(self.address)[2:] + " = [" + output + "]"
 
             elif(self.data_type_key == DATA_TYPE_STRING_LITERAL_KEY):
                 return "IDA_" + hex(self.address)[2:] + " = b\'" + output + '\''
@@ -153,18 +172,39 @@ class DEP_Conversion():
     # base on Byte/Word/Dword/Qword convert byte stream to number
     # parameter: base big_endian prefix suffix
     def NumberConversion(self):
-        Number_array = []
+        number_bytes_array = []
         type_len_list = {DATA_TYPE_BYTE_KEY:1, DATA_TYPE_WORD_KEY:2, DATA_TYPE_DWORD_KEY:4, DATA_TYPE_QWORD_KEY:8}
         Number_len = type_len_list[self.data_type_key]
         if(not self.big_endian):
             for i in range(0, len(self.data_bytes), Number_len):
-                Number_array.append(int.from_bytes(self.data_bytes[i:i+Number_len],byteorder='little'))
+                number_bytes_array.append(int.from_bytes(self.data_bytes[i:i+Number_len],byteorder='little'))
         else:
             for i in range(0, len(self.data_bytes), Number_len):
-                Number_array.append(int.from_bytes(self.data_bytes[i:i+Number_len],byteorder='big'))
+                number_bytes_array.append(int.from_bytes(self.data_bytes[i:i+Number_len],byteorder='big'))
         if(self.base > 0 and self.base < 36):
-            return self.delimiter.join("{0}{1}{2}".format(self.prefix,str(self.convert_base(i,self.base)),self.suffix) for i in Number_array)
+            return self.delimiter.join("{0}{1}{2}".format(self.prefix,str(self.convert_base(i,self.base)),self.suffix) for i in number_bytes_array)
         return None
+
+    def FloatConversion(self):
+        number_bytes_array = []
+        type_len_list = {DATA_TYPE_FLOAT_KEY:4, DATA_TYPE_DOUBLE_KEY:8}
+        Number_len = type_len_list[self.data_type_key]
+        for i in range(0, len(self.data_bytes), Number_len):
+            chunk = self.data_bytes[i:i + Number_len]
+            if len(chunk) == Number_len:
+                number_bytes_array.append(chunk)
+        format_char = '<f' if self.data_type_key == DATA_TYPE_FLOAT_KEY else '<d'
+        if self.big_endian:
+            format_char = '>' + format_char[1]
+
+        float_values = []
+        for chunk in number_bytes_array:
+            value = unpack(format_char, chunk)[0]
+            float_values.append(value)
+
+        return self.delimiter.join("{0}{1}{2}".format(self.prefix,str(i),self.suffix) for i in float_values)       
+
+
 
     def StringLiteralConversion(self):
         return str(self.data_bytes)[2:-1]
@@ -228,6 +268,8 @@ class DEP_Form(idaapi.Form):
             (idc.is_word, DATA_TYPE_WORD_KEY),
             (idc.is_dword, DATA_TYPE_DWORD_KEY),
             (idc.is_qword, DATA_TYPE_QWORD_KEY),
+            (idc.is_float, DATA_TYPE_FLOAT_KEY),
+            (idc.is_double, DATA_TYPE_DOUBLE_KEY),
             (idc.is_strlit, DATA_TYPE_STRING_LITERAL_KEY),
             (idc.is_code, DATA_TYPE_ASSEMBLY_CODE_KEY),
         ]
@@ -354,6 +396,18 @@ Export Plus: Export Data
                 self.ShowField(self._keep_comments,False)
                 self.ShowField(self._keep_names,False)
 
+            # Float,Double
+            elif(self.export_data_type_key in [DATA_TYPE_FLOAT_KEY, DATA_TYPE_DOUBLE_KEY]):
+                self.ShowField(self._export_type,True)
+
+                self.ShowField(self._endianness,True)
+                self.ShowField(self._base,False)
+                self.ShowField(self._delimiter,True)
+                self.ShowField(self._prefix,True)
+                self.ShowField(self._suffix,True)
+                self.ShowField(self._keep_comments,False)
+                self.ShowField(self._keep_names,False)
+
             # String literal
             elif(self.export_data_type_key == DATA_TYPE_STRING_LITERAL_KEY):
                 self.ShowField(self._export_type,True)
@@ -473,27 +527,37 @@ Export Plus: Export Data
             if(self.export_as_type_key == EXPORT_FORMAT_C_VARIABLE_KEY):
                 # export as C array
                 self.export_delimiter = ", "
-                self.SetControlValue(self._delimiter,", ")
+                self.SetControlValue(self._delimiter, self.export_delimiter)
                 self.export_suffix = ""
-                self.SetControlValue(self._suffix,"")
+                self.SetControlValue(self._suffix, self.export_suffix)
 
                 # add "unsigned long long" suffix for 64bit c data
                 if(self.export_data_type_key == DATA_TYPE_QWORD_KEY):
                     self.export_suffix = "ULL"
-                    self.SetControlValue(self._suffix,"ULL")
+                    self.SetControlValue(self._suffix, self.export_suffix)
 
                 # oct prefix in c data
                 if(self.export_base_key == DATA_BASE_OCT_KEY):
                     self.export_prefix = "0"
-                    self.SetControlValue(self._prefix,self.export_prefix)
+                    self.SetControlValue(self._prefix, self.export_prefix)
 
 
-            if(self.export_as_type_key == EXPORT_FORMAT_PYTHON_VARIABLE_KEY):
+            elif(self.export_as_type_key == EXPORT_FORMAT_PYTHON_VARIABLE_KEY):
                 # export as Python array
                 self.export_delimiter = ", "
-                self.SetControlValue(self._delimiter,", ")
+                self.SetControlValue(self._delimiter, self.export_delimiter)
                 self.export_suffix = ""
-                self.SetControlValue(self._suffix,"")
+                self.SetControlValue(self._suffix, self.export_suffix)
+
+        elif(self.export_data_type_key in [DATA_TYPE_FLOAT_KEY, DATA_TYPE_DOUBLE_KEY]):
+            self.export_delimiter = ", "
+            self.SetControlValue(self._delimiter, self.export_delimiter)
+            self.export_prefix = ""
+            self.SetControlValue(self._prefix, self.export_prefix)
+            self.export_suffix = ""
+            self.SetControlValue(self._suffix, self.export_suffix)
+
+
 
 
 
