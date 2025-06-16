@@ -342,12 +342,6 @@ Export Plus: Export Data
                 self.ShowField(self._keep_comments,False)
                 self.ShowField(self._keep_names,False)
 
-                # export as string
-                if(self.export_as_type_key == EXPORT_FORMAT_STRING_KEY):
-                    self.EnableField(self._delimiter,True)
-                    self.EnableField(self._prefix,True)
-                    self.EnableField(self._suffix,True)
-
             # Word,Dword,Qword
             elif(self.export_data_type_key in [DATA_TYPE_WORD_KEY, DATA_TYPE_DWORD_KEY, DATA_TYPE_QWORD_KEY]):
                 self.ShowField(self._export_type,True)
@@ -359,13 +353,6 @@ Export Plus: Export Data
                 self.ShowField(self._suffix,True)
                 self.ShowField(self._keep_comments,False)
                 self.ShowField(self._keep_names,False)
-
-                # export as string
-                if(self.export_as_type_key == EXPORT_FORMAT_STRING_KEY):
-                    self.EnableField(self._endianness,True)
-                    self.EnableField(self._delimiter,True)
-                    self.EnableField(self._prefix,True)
-                    self.EnableField(self._suffix,True)
 
             # String literal
             elif(self.export_data_type_key == DATA_TYPE_STRING_LITERAL_KEY):
