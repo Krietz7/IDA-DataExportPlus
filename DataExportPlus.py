@@ -7,7 +7,7 @@ import ida_ida
 from ida_kernwin import add_hotkey
 from ida_bytes import get_flags
 
-VERSION = "1.2.0"
+VERSION = "1.2.1"
 
 
 # Notice: Since the selected value of IDA's self.DropdownListControl gets the index of the incoming List object, 
@@ -596,7 +596,7 @@ class DataExportPlus(idaapi.plugin_t):
                     form.Free()
                     return 1
             try:
-                if(form.export_data_type_key == 6):
+                if(form.export_data_type_key == DATA_TYPE_RAW_BYTES_KEY):
                     with open(form.export_file_path, "wb") as file_handle:
                         file_handle.write(form.Data_bytes)
                 else:
