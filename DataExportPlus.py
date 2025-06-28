@@ -7,7 +7,7 @@ import ida_ida
 from ida_kernwin import add_hotkey
 from ida_bytes import get_flags
 
-VERSION = "1.3.3"
+VERSION = "1.3.4"
 
 
 # Notice: Since the selected value of IDA's self.DropdownListControl gets the index of the incoming List object, 
@@ -635,20 +635,14 @@ Export Plus: Export Data
             elif self.export_data_type_key == DATA_TYPE_QWORD_KEY:  # 64-bit
                 suffix = "LL"
             elif self.export_data_type_key == DATA_TYPE_FLOAT_KEY:  # float
-                suffix = "F"
+                suffix = ""
             elif self.export_data_type_key == DATA_TYPE_DOUBLE_KEY: # double
                 suffix = ""
             else:
                 suffix = ""
 
-            if not self.export_signed:
-                if suffix in ["", "F"]:
-                    if self.export_data_type_key == DATA_TYPE_FLOAT_KEY:
-                        suffix = "F"  
-                    else:
-                        suffix = ""
-                else:
-                    suffix = "U" + suffix
+            if not self.export_signed and  self.export_data_type_key in [DATA_TYPE_BYTE_KEY, DATA_TYPE_WORD_KEY, DATA_TYPE_DWORD_KEY, DATA_TYPE_QWORD_KEY]:
+                suffix = "U" + suffix
             self.export_suffix = suffix
 
         self.SetControlValue(self._suffix, self.export_suffix)
