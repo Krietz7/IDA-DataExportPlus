@@ -7,7 +7,7 @@ import ida_ida
 from ida_kernwin import add_hotkey
 from ida_bytes import get_flags
 
-VERSION = "1.3.2"
+VERSION = "1.3.3"
 
 
 # Notice: Since the selected value of IDA's self.DropdownListControl gets the index of the incoming List object, 
@@ -159,10 +159,9 @@ class DEP_Conversion():
                             c = chr(byte)
                             # To avoid confusion with the previous \xHH, force escape if the current character is a hex letter
                             if c in '0123456789abcdefABCDEF' and is_escape:
-                                result.append(f'\\x{byte:02X}')
-                            else:
-                                result.append(c)
-                                is_escape = False
+                                result.append('\"\"')
+                            is_escape = False
+                            result.append(c)
                         else:
                             result.append(f'\\x{byte:02X}')
                             is_escape = True
