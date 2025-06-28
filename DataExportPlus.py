@@ -7,7 +7,7 @@ import ida_ida
 from ida_kernwin import add_hotkey
 from ida_bytes import get_flags
 
-VERSION = "1.2.1"
+VERSION = "1.3.0"
 
 
 # Notice: Since the selected value of IDA's self.DropdownListControl gets the index of the incoming List object, 
@@ -79,6 +79,7 @@ class DEP_Conversion():
         self.data_bytes = data_bytes
         self.export_as_type_key = export_as_type_key
         self.big_endian = big_endian
+        self.signed = signed
         self.base_key = base_key
         self.data_type_key = data_type_key 
         self.delimiter = delimiter
@@ -120,10 +121,12 @@ class DEP_Conversion():
         # C variable
         elif(self.export_as_type_key == EXPORT_FORMAT_C_VARIABLE_KEY):
             if(self.data_type_key in [DATA_TYPE_BYTE_KEY, DATA_TYPE_WORD_KEY, DATA_TYPE_DWORD_KEY, DATA_TYPE_QWORD_KEY]):
-                C_type = {DATA_TYPE_BYTE_KEY:"unsigned char",
-                               DATA_TYPE_WORD_KEY:"unsigned short",
-                               DATA_TYPE_DWORD_KEY:"unsigned int",
-                               DATA_TYPE_QWORD_KEY:"unsigned long long int"}[self.data_type_key]
+                C_type = {DATA_TYPE_BYTE_KEY:"char",
+                               DATA_TYPE_WORD_KEY:"short",
+                               DATA_TYPE_DWORD_KEY:"int",
+                               DATA_TYPE_QWORD_KEY:"long long int"}[self.data_type_key]
+                if(not self.signed):
+                    C_type = "unsigned "+C_type
                 return C_type+" IDA_"+ hex(self.address)[2:] + "[] = {" + output + "};"
 
             elif(self.data_type_key in [DATA_TYPE_FLOAT_KEY, DATA_TYPE_DOUBLE_KEY]):
@@ -158,32 +161,40 @@ class DEP_Conversion():
 
         return None
 
-    def convert_base(self, number, target_base):
-        digit_map = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ'
-        result = ''
-        while number:
-            remainder = number % target_base
-            result = digit_map[remainder] + result
-            number //= target_base
-
-        if(result == ''):
-            return "0"
-        return result
-
     # base on Byte/Word/Dword/Qword convert byte stream to number
-    # parameter: base big_endian prefix suffix
+    # parameter: base big_endian sign prefix suffix delimiter 
     def NumberConversion(self):
         number_bytes_array = []
         type_len_list = {DATA_TYPE_BYTE_KEY:1, DATA_TYPE_WORD_KEY:2, DATA_TYPE_DWORD_KEY:4, DATA_TYPE_QWORD_KEY:8}
         Number_len = type_len_list[self.data_type_key]
-        if(not self.big_endian):
-            for i in range(0, len(self.data_bytes), Number_len):
-                number_bytes_array.append(int.from_bytes(self.data_bytes[i:i+Number_len],byteorder='little'))
-        else:
-            for i in range(0, len(self.data_bytes), Number_len):
-                number_bytes_array.append(int.from_bytes(self.data_bytes[i:i+Number_len],byteorder='big'))
-        if(self.base > 0 and self.base < 36):
-            return self.delimiter.join("{0}{1}{2}".format(self.prefix,str(self.convert_base(i,self.base)),self.suffix) for i in number_bytes_array)
+
+        for i in range(0, len(self.data_bytes), Number_len):
+            chunk = self.data_bytes[i:i+Number_len]
+            number = int.from_bytes(chunk, byteorder='little' if not self.big_endian else 'big', signed=self.signed)
+            number_bytes_array.append(number)
+
+        def format_number(n):
+            base = self.base
+            prefix = self.prefix or ''
+            suffix = self.suffix or ''
+
+            is_negative = n < 0
+            num_abs = abs(n)
+
+            if base == 10:
+                s = str(num_abs)
+            elif base == 2:
+                s = bin(num_abs)[2:]
+            elif base == 8:
+                s = oct(num_abs)[2:]
+            elif base == 16:
+                s = hex(num_abs)[2:]
+            result = prefix + s if not is_negative else '-' + prefix + s
+
+            return result + suffix
+
+        if self.base > 0 and self.base < 37:
+            return self.delimiter.join(format_number(i) for i in number_bytes_array)
         return None
 
     def FloatConversion(self):
@@ -462,12 +473,6 @@ Export Plus: Export Data
                 self.EnableField(self._prefix,True)
                 self.EnableField(self._suffix,True)
 
-                # when exporting signed integers, disable prefix
-                if(self.export_signed == True):
-                    self.EnableField(self._prefix,False)
-                else:
-                    self.EnableField(self._prefix,True)
-
             # export as C varible
             elif(self.export_as_type_key == EXPORT_FORMAT_C_VARIABLE_KEY):
                 self.EnableField(self._delimiter,False)
@@ -569,13 +574,33 @@ Export Plus: Export Data
         self.SetControlValue(self._delimiter,self.export_delimiter)
 
     def __SetDefaultSuffixValue(self):
-        if(self.export_data_type_key in [DATA_TYPE_BYTE_KEY, DATA_TYPE_WORD_KEY, DATA_TYPE_DWORD_KEY, DATA_TYPE_QWORD_KEY,
-                                         DATA_TYPE_FLOAT_KEY, DATA_TYPE_DOUBLE_KEY]):
-            self.export_suffix = ""
-            if(self.export_as_type_key == EXPORT_FORMAT_C_VARIABLE_KEY):
-                # add "unsigned long long" suffix for 64bit unsigned c data
-                if(self.export_data_type_key == DATA_TYPE_QWORD_KEY):
-                    self.export_suffix = "ULL"
+        self.export_suffix = ""
+
+        if self.export_as_type_key == EXPORT_FORMAT_C_VARIABLE_KEY:
+            if self.export_data_type_key == DATA_TYPE_BYTE_KEY:     # 8-bit
+                suffix = ""
+            elif self.export_data_type_key == DATA_TYPE_WORD_KEY:   # 16-bit
+                suffix = ""
+            elif self.export_data_type_key == DATA_TYPE_DWORD_KEY:  # 32-bit
+                suffix = "L"
+            elif self.export_data_type_key == DATA_TYPE_QWORD_KEY:  # 64-bit
+                suffix = "LL"
+            elif self.export_data_type_key == DATA_TYPE_FLOAT_KEY:  # float
+                suffix = "F"
+            elif self.export_data_type_key == DATA_TYPE_DOUBLE_KEY: # double
+                suffix = ""
+            else:
+                suffix = ""
+
+            if not self.export_signed:
+                if suffix in ["", "F"]:
+                    if self.export_data_type_key == DATA_TYPE_FLOAT_KEY:
+                        suffix = "F"  
+                    else:
+                        suffix = ""
+                else:
+                    suffix = "U" + suffix
+            self.export_suffix = suffix
 
         self.SetControlValue(self._suffix, self.export_suffix)
 
