@@ -462,6 +462,12 @@ Export Plus: Export Data
                 self.EnableField(self._prefix,True)
                 self.EnableField(self._suffix,True)
 
+                # when exporting signed integers, disable prefix
+                if(self.export_signed == True):
+                    self.EnableField(self._prefix,False)
+                else:
+                    self.EnableField(self._prefix,True)
+
             # export as C varible
             elif(self.export_as_type_key == EXPORT_FORMAT_C_VARIABLE_KEY):
                 self.EnableField(self._delimiter,False)
@@ -474,11 +480,6 @@ Export Plus: Export Data
                 self.EnableField(self._prefix,False)
                 self.EnableField(self._suffix,False)
 
-            # when exporting signed integers, disable prefix
-            if(self.export_signed == True):
-                self.EnableField(self._prefix,False)
-            else:
-                self.EnableField(self._prefix,True)
 
 
             # change default value
@@ -544,47 +545,39 @@ Export Plus: Export Data
 
 
     def SetControlsDefaultValue(self):
-        if(self.export_data_type_key in [DATA_TYPE_BYTE_KEY, DATA_TYPE_WORD_KEY, DATA_TYPE_DWORD_KEY, DATA_TYPE_QWORD_KEY]):
+        self.__SetDefaultPrefixValue()
+        self.__SetDefaultDelimiterValue()
+        self.__SetDefaultSuffixValue()
 
+    def __SetDefaultPrefixValue(self):
+        if(self.export_data_type_key in [DATA_TYPE_BYTE_KEY, DATA_TYPE_WORD_KEY, DATA_TYPE_DWORD_KEY, DATA_TYPE_QWORD_KEY]):
             Prefix_list = {DATA_BASE_HEX_KEY:"0x", DATA_BASE_DEC_KEY:"", DATA_BASE_OCT_KEY:"0o", DATA_BASE_BIN_KEY:"0b"}
             self.export_prefix = Prefix_list[self.export_base_key]
-            self.SetControlValue(self._prefix,self.export_prefix)
 
+            if(self.export_as_type_key == EXPORT_FORMAT_C_VARIABLE_KEY and self.export_base_key == DATA_BASE_OCT_KEY):
+                self.export_prefix = "0"
+
+        if(self.export_data_type_key in [DATA_TYPE_FLOAT_KEY, DATA_TYPE_DOUBLE_KEY]):
+            self.export_prefix = ""
+
+        self.SetControlValue(self._prefix,self.export_prefix)
+
+    def __SetDefaultDelimiterValue(self):
+        if(self.export_data_type_key in [DATA_TYPE_BYTE_KEY, DATA_TYPE_WORD_KEY, DATA_TYPE_DWORD_KEY, DATA_TYPE_QWORD_KEY,
+                                         DATA_TYPE_FLOAT_KEY, DATA_TYPE_DOUBLE_KEY]):
+            self.export_delimiter = ", "
+        self.SetControlValue(self._delimiter,self.export_delimiter)
+
+    def __SetDefaultSuffixValue(self):
+        if(self.export_data_type_key in [DATA_TYPE_BYTE_KEY, DATA_TYPE_WORD_KEY, DATA_TYPE_DWORD_KEY, DATA_TYPE_QWORD_KEY,
+                                         DATA_TYPE_FLOAT_KEY, DATA_TYPE_DOUBLE_KEY]):
+            self.export_suffix = ""
             if(self.export_as_type_key == EXPORT_FORMAT_C_VARIABLE_KEY):
-                # export as C array
-                self.export_delimiter = ", "
-                self.SetControlValue(self._delimiter, self.export_delimiter)
-                self.export_suffix = ""
-                self.SetControlValue(self._suffix, self.export_suffix)
-
                 # add "unsigned long long" suffix for 64bit unsigned c data
                 if(self.export_data_type_key == DATA_TYPE_QWORD_KEY):
                     self.export_suffix = "ULL"
-                    self.SetControlValue(self._suffix, self.export_suffix)
 
-                # oct prefix in c data
-                if(self.export_base_key == DATA_BASE_OCT_KEY):
-                    self.export_prefix = "0"
-                    self.SetControlValue(self._prefix, self.export_prefix)
-
-
-            elif(self.export_as_type_key == EXPORT_FORMAT_PYTHON_VARIABLE_KEY):
-                # export as Python array
-                self.export_delimiter = ", "
-                self.SetControlValue(self._delimiter, self.export_delimiter)
-                self.export_suffix = ""
-                self.SetControlValue(self._suffix, self.export_suffix)
-
-        elif(self.export_data_type_key in [DATA_TYPE_FLOAT_KEY, DATA_TYPE_DOUBLE_KEY]):
-            self.export_delimiter = ", "
-            self.SetControlValue(self._delimiter, self.export_delimiter)
-            self.export_prefix = ""
-            self.SetControlValue(self._prefix, self.export_prefix)
-            self.export_suffix = ""
-            self.SetControlValue(self._suffix, self.export_suffix)
-
-
-
+        self.SetControlValue(self._suffix, self.export_suffix)
 
 
 class DataExportPlus(idaapi.plugin_t):
