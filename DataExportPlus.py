@@ -69,7 +69,8 @@ class DEP_Conversion():
                  data_type_key = DATA_TYPE_BYTE_KEY,
                  export_as_type_key = EXPORT_FORMAT_STRING_KEY, 
                  big_endian = False, 
-                 base_key = DATA_BASE_HEX_KEY, 
+                 base_key = DATA_BASE_HEX_KEY,
+                 signed = False,
                  delimiter = " ",prefix = "",suffix = "",
                  keep_comments = False, 
                  keep_names = False):
@@ -251,6 +252,7 @@ class DEP_Form(idaapi.Form):
         # Format Options
         self.export_big_endian = False
         self.export_base_key = DATA_BASE_HEX_KEY
+        self.export_signed = False
         self.export_delimiter = ","
         self.export_prefix = "0x"
         self.export_suffix = ""
@@ -280,7 +282,7 @@ class DEP_Form(idaapi.Form):
             r'''STARTITEM 0
 BUTTON YES* Export
 Export Plus: Export Data
-            
+
             {FormChangeCb}
             <Selected address :{_address}>
             <Selected Length  :{_length}>
@@ -291,6 +293,7 @@ Export Plus: Export Data
             Export Format:
             <##-   Endianness :{_endianness}>
             <##-   Base       :{_base}>
+            <##-   Signed     :{_signed}>
             <##-   Delimiter  :{_delimiter}>
             <##-   Prefix     :{_prefix}>
             <##-   Suffix     :{_suffix}>
@@ -311,6 +314,7 @@ Export Plus: Export Data
 
                 "_endianness": self.DropdownListControl(items = ["Little-endian","Big-endian"]),
                 "_base": self.DropdownListControl(items = list(self.Data_base_list.keys())),
+                "_signed": self.DropdownListControl(items = ["False", "True"]),
                 "_delimiter": self.StringInput(value = self.export_delimiter,swidth = 30),
                 "_prefix": self.StringInput(value = self.export_prefix,swidth = 30),
                 "_suffix": self.StringInput(value = self.export_suffix,swidth = 30),
@@ -365,9 +369,10 @@ Export Plus: Export Data
                 return 1
 
         # change export format or export type
-        if(fid in [-1, self._data_type.id, self._export_type.id]):
+        if(fid in [-1, self._data_type.id, self._export_type.id, self._signed.id]):
             self.export_data_type_key = self.GetControlValue(self._data_type)
             self.export_as_type_key = self.GetControlValue(self._export_type)
+            self.export_signed = {0:False,1:True}[self.GetControlValue(self._signed)]
 
             ### change Form Controls property
 
@@ -378,6 +383,7 @@ Export Plus: Export Data
 
                 self.ShowField(self._endianness,False)
                 self.ShowField(self._base,True)
+                self.ShowField(self._signed,True)
                 self.ShowField(self._delimiter,True)
                 self.ShowField(self._prefix,True)
                 self.ShowField(self._suffix,True)
@@ -390,6 +396,7 @@ Export Plus: Export Data
 
                 self.ShowField(self._endianness,True)
                 self.ShowField(self._base,True)
+                self.ShowField(self._signed,True)
                 self.ShowField(self._delimiter,True)
                 self.ShowField(self._prefix,True)
                 self.ShowField(self._suffix,True)
@@ -402,6 +409,7 @@ Export Plus: Export Data
 
                 self.ShowField(self._endianness,True)
                 self.ShowField(self._base,False)
+                self.ShowField(self._signed,False)
                 self.ShowField(self._delimiter,True)
                 self.ShowField(self._prefix,True)
                 self.ShowField(self._suffix,True)
@@ -414,6 +422,7 @@ Export Plus: Export Data
 
                 self.ShowField(self._endianness,False)
                 self.ShowField(self._base,False)
+                self.ShowField(self._signed,False)
                 self.ShowField(self._delimiter,False)
                 self.ShowField(self._prefix,False)
                 self.ShowField(self._suffix,False)
@@ -426,6 +435,7 @@ Export Plus: Export Data
 
                 self.ShowField(self._endianness,False)
                 self.ShowField(self._base,False)
+                self.ShowField(self._signed,False)
                 self.ShowField(self._delimiter,False)
                 self.ShowField(self._prefix,False)
                 self.ShowField(self._suffix,False)
@@ -438,6 +448,7 @@ Export Plus: Export Data
 
                 self.ShowField(self._endianness,False)
                 self.ShowField(self._base,False)
+                self.ShowField(self._signed,False)
                 self.ShowField(self._delimiter,False)
                 self.ShowField(self._prefix,False)
                 self.ShowField(self._suffix,False)
@@ -447,7 +458,6 @@ Export Plus: Export Data
             ## control the availability of fields
             # export as string
             if(self.export_as_type_key == EXPORT_FORMAT_STRING_KEY):
-                self.EnableField(self._endianness,True)
                 self.EnableField(self._delimiter,True)
                 self.EnableField(self._prefix,True)
                 self.EnableField(self._suffix,True)
@@ -464,6 +474,13 @@ Export Plus: Export Data
                 self.EnableField(self._prefix,False)
                 self.EnableField(self._suffix,False)
 
+            # when exporting signed integers, disable prefix
+            if(self.export_signed == True):
+                self.EnableField(self._prefix,False)
+            else:
+                self.EnableField(self._prefix,True)
+
+
             # change default value
             self.SetControlsDefaultValue()
 
@@ -471,9 +488,17 @@ Export Plus: Export Data
 
 
 
-        elif(fid in [self._endianness.id,self._base.id,self._delimiter.id,self._prefix.id,self._suffix.id,self._keep_comments.id,self._keep_names.id]):
+        elif(fid in [self._endianness.id,
+                     self._base.id,
+                     self._signed.id,
+                     self._delimiter.id,
+                     self._prefix.id,
+                     self._suffix.id,
+                     self._keep_comments.id,
+                     self._keep_names.id]):
             self.export_big_endian = self.GetControlValue(self._endianness)
             self.export_base_key = self.GetControlValue(self._base)
+            self.export_signed = {0:False,1:True}[self.GetControlValue(self._signed)]
             self.export_delimiter = self.GetControlValue(self._delimiter)
             self.export_prefix = self.GetControlValue(self._prefix)
             self.export_suffix = self.GetControlValue(self._suffix)
@@ -481,7 +506,7 @@ Export Plus: Export Data
             self.export_keep_names = {0:False,1:True}[self.GetControlValue(self._keep_names)]
 
 
-            if(fid == self._base.id):
+            if(fid in [self._base.id, self._signed.id]):
                 self.SetControlsDefaultValue()
 
 
@@ -508,6 +533,7 @@ Export Plus: Export Data
                            export_as_type_key = self.export_as_type_key,
                            big_endian = self.export_big_endian,
                            base_key = self.export_base_key,
+                           signed = self.export_signed,
                            delimiter = self.export_delimiter,
                            prefix = self.export_prefix,
                            suffix = self.export_suffix, 
@@ -531,7 +557,7 @@ Export Plus: Export Data
                 self.export_suffix = ""
                 self.SetControlValue(self._suffix, self.export_suffix)
 
-                # add "unsigned long long" suffix for 64bit c data
+                # add "unsigned long long" suffix for 64bit unsigned c data
                 if(self.export_data_type_key == DATA_TYPE_QWORD_KEY):
                     self.export_suffix = "ULL"
                     self.SetControlValue(self._suffix, self.export_suffix)
