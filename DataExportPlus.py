@@ -7,7 +7,7 @@ import ida_ida
 from ida_kernwin import add_hotkey
 from ida_bytes import get_flags
 
-VERSION = "1.3.0"
+VERSION = "1.3.1"
 
 
 # Notice: Since the selected value of IDA's self.DropdownListControl gets the index of the incoming List object, 
@@ -136,7 +136,39 @@ class DEP_Conversion():
                 return C_type+" IDA_"+ hex(self.address)[2:] + "[] = {" + output + "};"
 
             elif(self.data_type_key == DATA_TYPE_STRING_LITERAL_KEY):
-                return "unsigned char IDA_"+ hex(self.address)[2:] + "[] = \"" + output + "\";"
+                def strliteral_to_c_string(sl):
+                    result = []
+                    is_escape = False
+                    for byte in sl:
+                        if byte == b'\\'[0]:
+                            result.append("\\\\")
+                            is_escape = False
+                        elif byte == b'"'[0]:
+                            result.append("\\\"")
+                            is_escape = False
+                        elif byte == ord('\n'):
+                            result.append("\\n")
+                            is_escape = False
+                        elif byte == ord('\r'):
+                            result.append("\\r")
+                            is_escape = False
+                        elif byte == ord('\t'):
+                            result.append("\\t")
+                            is_escape = False
+                        elif 32 <= byte <= 126:
+                            c = chr(byte)
+                            # To avoid confusion with the previous \xHH, force escape if the current character is a hex letter
+                            if c in '0123456789abcdefABCDEF' and is_escape:
+                                result.append(f'\\x{byte:02X}')
+                            else:
+                                result.append(c)
+                                is_escape = False
+                        else:
+                            result.append(f'\\x{byte:02X}')
+                            is_escape = True
+                    return ''.join(result)
+
+                return "unsigned char IDA_"+ hex(self.address)[2:] + "[] = \"" + strliteral_to_c_string(self.data_bytes) + "\";"
 
             elif(self.data_type_key == DATA_TYPE_ASSEMBLY_CODE_KEY):
                 output = '\\n\"\n\"'.join([line for line in output.splitlines()])[:-1]
