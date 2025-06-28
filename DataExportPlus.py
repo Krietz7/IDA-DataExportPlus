@@ -7,7 +7,7 @@ import ida_ida
 from ida_kernwin import add_hotkey
 from ida_bytes import get_flags
 
-VERSION = "1.3.1"
+VERSION = "1.3.2"
 
 
 # Notice: Since the selected value of IDA's self.DropdownListControl gets the index of the incoming List object, 
@@ -186,7 +186,25 @@ class DEP_Conversion():
                 return "IDA_" + hex(self.address)[2:] + " = [" + output + "]"
 
             elif(self.data_type_key == DATA_TYPE_STRING_LITERAL_KEY):
-                return "IDA_" + hex(self.address)[2:] + " = b\'" + output + '\''
+                def bytes_to_py_literal(data):
+                    result = []
+                    for byte in data:
+                        if byte == 39:
+                            result.append("\\'")
+                        elif byte == 92:
+                            result.append("\\\\")
+                        elif byte == ord('\n'):
+                            result.append("\\n")
+                        elif byte == ord('\r'):
+                            result.append("\\r")
+                        elif byte == ord('\t'):
+                            result.append("\\t")
+                        elif 32 <= byte <= 126:
+                            result.append(chr(byte))
+                        else: 
+                            result.append(f"\\x{byte:02X}")
+                    return ''.join(result)
+                return "IDA_" + hex(self.address)[2:] + " = b\'" + bytes_to_py_literal(self.data_bytes) + '\''
 
             elif(self.data_type_key == DATA_TYPE_ASSEMBLY_CODE_KEY):
                 return "IDA_" + hex(self.address)[2:] + " = \'\'\'" + output + '\'\'\''
