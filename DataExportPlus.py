@@ -7,10 +7,10 @@ import ida_ida
 from ida_kernwin import add_hotkey
 from ida_bytes import get_flags
 
-VERSION = "1.3.4"
+VERSION = "1.4.0"
 
 
-# Notice: Since the selected value of IDA's self.DropdownListControl gets the index of the incoming List object, 
+# Notice: Since the selected value of IDA's self.DropdownListControl gets the index of the incoming List object,
 # the constant definition of key values ​​also needs to follow the 0-index
 
 # Define constants for data base
@@ -64,24 +64,27 @@ class DEP_Conversion():
         return (Data_base_list,Data_type_list,Data_exported_format_list)
 
     # data(bytes) big_endian(Bool) data_type(int) base(int) delimiter(str) prefix(str) suffix(str)
-    def __init__(self, address, 
-                 data_bytes, 
+    def __init__(self, address,
+                 data_bytes,
                  data_type_key = DATA_TYPE_BYTE_KEY,
-                 export_as_type_key = EXPORT_FORMAT_STRING_KEY, 
-                 big_endian = False, 
+                 export_as_type_key = EXPORT_FORMAT_STRING_KEY,
+                 big_endian = False,
                  base_key = DATA_BASE_HEX_KEY,
                  signed = False,
+                 pad_zero = False,
                  delimiter = " ",prefix = "",suffix = "",
-                 keep_comments = False, 
-                 keep_names = False):
+                 keep_comments = False,
+                 keep_names = False,
+                 ):
         self.address = address
         self.Data_base_list, self.Data_type_list, _ = self.get_list()
         self.data_bytes = data_bytes
         self.export_as_type_key = export_as_type_key
         self.big_endian = big_endian
         self.signed = signed
+        self.pad_zero = pad_zero
         self.base_key = base_key
-        self.data_type_key = data_type_key 
+        self.data_type_key = data_type_key
         self.delimiter = delimiter
         self.prefix = prefix
         self.suffix = suffix
@@ -200,7 +203,7 @@ class DEP_Conversion():
                             result.append("\\t")
                         elif 32 <= byte <= 126:
                             result.append(chr(byte))
-                        else: 
+                        else:
                             result.append(f"\\x{byte:02X}")
                     return ''.join(result)
                 return "IDA_" + hex(self.address)[2:] + " = b\'" + bytes_to_py_literal(self.data_bytes) + '\''
@@ -211,7 +214,7 @@ class DEP_Conversion():
         return None
 
     # base on Byte/Word/Dword/Qword convert byte stream to number
-    # parameter: base big_endian sign prefix suffix delimiter 
+    # parameter: base big_endian sign prefix suffix delimiter
     def NumberConversion(self):
         number_bytes_array = []
         type_len_list = {DATA_TYPE_BYTE_KEY:1, DATA_TYPE_WORD_KEY:2, DATA_TYPE_DWORD_KEY:4, DATA_TYPE_QWORD_KEY:8}
@@ -219,6 +222,8 @@ class DEP_Conversion():
 
         for i in range(0, len(self.data_bytes), Number_len):
             chunk = self.data_bytes[i:i+Number_len]
+            if len(chunk) < Number_len:
+                chunk += b'\x00' * (Number_len - len(chunk))
             number = int.from_bytes(chunk, byteorder='little' if not self.big_endian else 'big', signed=self.signed)
             number_bytes_array.append(number)
 
@@ -230,14 +235,29 @@ class DEP_Conversion():
             is_negative = n < 0
             num_abs = abs(n)
 
+            pad_width = 0
+            if self.pad_zero:
+                if base == 2:
+                    pad_width = Number_len * 8
+                elif base == 8:
+                    pad_width = Number_len * 3
+                elif base == 16:
+                    pad_width = Number_len * 2
+
             if base == 10:
                 s = str(num_abs)
             elif base == 2:
                 s = bin(num_abs)[2:]
+                if pad_width:
+                    s = s.zfill(pad_width)
             elif base == 8:
                 s = oct(num_abs)[2:]
+                if pad_width:
+                    s = s.zfill(pad_width)
             elif base == 16:
                 s = hex(num_abs)[2:]
+                if pad_width:
+                    s = s.zfill(pad_width)
             result = prefix + s if not is_negative else '-' + prefix + s
 
             return result + suffix
@@ -263,7 +283,7 @@ class DEP_Conversion():
             value = unpack(format_char, chunk)[0]
             float_values.append(value)
 
-        return self.delimiter.join("{0}{1}{2}".format(self.prefix,str(i),self.suffix) for i in float_values)       
+        return self.delimiter.join("{0}{1}{2}".format(self.prefix,str(i),self.suffix) for i in float_values)
 
 
 
@@ -319,6 +339,7 @@ class DEP_Form(idaapi.Form):
         self.export_as_type_key = EXPORT_FORMAT_STRING_KEY
         self.export_keep_comments = False
         self.export_keep_names = False
+        self.export_pad_zero = False
 
         self.export_data = None
         self.export_file_path = getcwd() + "\\export_results.txt"
@@ -354,6 +375,7 @@ Export Plus: Export Data
             <##-   Endianness :{_endianness}>
             <##-   Base       :{_base}>
             <##-   Signed     :{_signed}>
+            <##-   Pad Zero   :{_pad_zero}>
             <##-   Delimiter  :{_delimiter}>
             <##-   Prefix     :{_prefix}>
             <##-   Suffix     :{_suffix}>
@@ -368,13 +390,14 @@ Export Plus: Export Data
 
                 "_address": self.NumericInput(value = self.export_address, tp=self.FT_ADDR, swidth=30),
                 "_length": self.NumericInput(value = self.export_address_len, swidth = 30),
-                "_select_data": self.StringInput(value = "",swidth = 30),                
+                "_select_data": self.StringInput(value = "",swidth = 30),
                 "_data_type": self.DropdownListControl(items = list(self.Data_type_list.keys()), selval = self.export_data_type_key),
                 "_export_type": self.DropdownListControl(items =list(self.Data_exported_format_list.keys())),
 
                 "_endianness": self.DropdownListControl(items = ["Little-endian","Big-endian"]),
                 "_base": self.DropdownListControl(items = list(self.Data_base_list.keys())),
                 "_signed": self.DropdownListControl(items = ["False", "True"]),
+                "_pad_zero": self.DropdownListControl(items = ["False", "True"]),
                 "_delimiter": self.StringInput(value = self.export_delimiter,swidth = 30),
                 "_prefix": self.StringInput(value = self.export_prefix,swidth = 30),
                 "_suffix": self.StringInput(value = self.export_suffix,swidth = 30),
@@ -415,7 +438,7 @@ Export Plus: Export Data
             try:
                 input_export_address = self.GetControlValue(self._address)
                 input_export_address_len = self.GetControlValue(self._length)
-    
+
                 self.min_ea = ida_ida.inf_get_min_ea()
                 self.max_ea = ida_ida.inf_get_max_ea()
 
@@ -444,6 +467,7 @@ Export Plus: Export Data
                 self.ShowField(self._endianness,False)
                 self.ShowField(self._base,True)
                 self.ShowField(self._signed,True)
+                self.ShowField(self._pad_zero,True)
                 self.ShowField(self._delimiter,True)
                 self.ShowField(self._prefix,True)
                 self.ShowField(self._suffix,True)
@@ -457,6 +481,7 @@ Export Plus: Export Data
                 self.ShowField(self._endianness,True)
                 self.ShowField(self._base,True)
                 self.ShowField(self._signed,True)
+                self.ShowField(self._pad_zero,True)
                 self.ShowField(self._delimiter,True)
                 self.ShowField(self._prefix,True)
                 self.ShowField(self._suffix,True)
@@ -470,6 +495,7 @@ Export Plus: Export Data
                 self.ShowField(self._endianness,True)
                 self.ShowField(self._base,False)
                 self.ShowField(self._signed,False)
+                self.ShowField(self._pad_zero,False)
                 self.ShowField(self._delimiter,True)
                 self.ShowField(self._prefix,True)
                 self.ShowField(self._suffix,True)
@@ -483,6 +509,7 @@ Export Plus: Export Data
                 self.ShowField(self._endianness,False)
                 self.ShowField(self._base,False)
                 self.ShowField(self._signed,False)
+                self.ShowField(self._pad_zero,False)
                 self.ShowField(self._delimiter,False)
                 self.ShowField(self._prefix,False)
                 self.ShowField(self._suffix,False)
@@ -496,6 +523,7 @@ Export Plus: Export Data
                 self.ShowField(self._endianness,False)
                 self.ShowField(self._base,False)
                 self.ShowField(self._signed,False)
+                self.ShowField(self._pad_zero,False)
                 self.ShowField(self._delimiter,False)
                 self.ShowField(self._prefix,False)
                 self.ShowField(self._suffix,False)
@@ -509,6 +537,7 @@ Export Plus: Export Data
                 self.ShowField(self._endianness,False)
                 self.ShowField(self._base,False)
                 self.ShowField(self._signed,False)
+                self.ShowField(self._pad_zero,False)
                 self.ShowField(self._delimiter,False)
                 self.ShowField(self._prefix,False)
                 self.ShowField(self._suffix,False)
@@ -546,6 +575,7 @@ Export Plus: Export Data
         elif(fid in [self._endianness.id,
                      self._base.id,
                      self._signed.id,
+                     self._pad_zero.id,
                      self._delimiter.id,
                      self._prefix.id,
                      self._suffix.id,
@@ -554,6 +584,7 @@ Export Plus: Export Data
             self.export_big_endian = self.GetControlValue(self._endianness)
             self.export_base_key = self.GetControlValue(self._base)
             self.export_signed = {0:False,1:True}[self.GetControlValue(self._signed)]
+            self.export_pad_zero = {0:False,1:True}[self.GetControlValue(self._pad_zero)]
             self.export_delimiter = self.GetControlValue(self._delimiter)
             self.export_prefix = self.GetControlValue(self._prefix)
             self.export_suffix = self.GetControlValue(self._suffix)
@@ -582,16 +613,17 @@ Export Plus: Export Data
 
 
     def RefreshExportWindow(self):
-        t = DEP_Conversion(address = self.export_address, 
+        t = DEP_Conversion(address = self.export_address,
                            data_bytes = self.Data_bytes,
                            data_type_key = self.export_data_type_key,
                            export_as_type_key = self.export_as_type_key,
                            big_endian = self.export_big_endian,
                            base_key = self.export_base_key,
                            signed = self.export_signed,
+                           pad_zero = self.export_pad_zero,
                            delimiter = self.export_delimiter,
                            prefix = self.export_prefix,
-                           suffix = self.export_suffix, 
+                           suffix = self.export_suffix,
                            keep_comments = self.export_keep_comments,
                            keep_names = self.export_keep_names)
         self.export_data = t.activate()
