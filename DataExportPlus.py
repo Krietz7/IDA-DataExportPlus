@@ -7,11 +7,11 @@ import ida_ida
 from ida_kernwin import add_hotkey
 from ida_bytes import get_flags
 
-VERSION = "1.4.0"
+VERSION = "1.4.1"
 
 
 # Notice: Since the selected value of IDA's self.DropdownListControl gets the index of the incoming List object,
-# the constant definition of key values ​​also needs to follow the 0-index
+# the constant definition of key values also needs to follow the 0-index
 
 # Define constants for data base
 DATA_BASE_HEX_KEY = 0
@@ -424,7 +424,7 @@ Export Plus: Export Data
                 self.min_ea = ida_ida.inf_get_min_ea()
                 self.max_ea = ida_ida.inf_get_max_ea()
 
-                if(self.min_ea < input_export_address and self.max_ea > input_export_address and self.max_ea > input_export_address + input_export_address_len):
+                if(self.min_ea <= input_export_address and self.max_ea >= input_export_address and self.max_ea >= input_export_address + input_export_address_len):
                     self.Data_bytes,data_str =self.GetEAData(input_export_address,input_export_address_len)
                     self.SetControlValue(self._select_data,data_str)
 
@@ -442,7 +442,7 @@ Export Plus: Export Data
                 self.min_ea = ida_ida.inf_get_min_ea()
                 self.max_ea = ida_ida.inf_get_max_ea()
 
-                if(self.min_ea < input_export_address and self.max_ea > input_export_address and self.max_ea > input_export_address + input_export_address_len):
+                if(self.min_ea <= input_export_address and self.max_ea >= input_export_address and self.max_ea > input_export_address + input_export_address_len):
                     self.Data_bytes,data_str =self.GetEAData(input_export_address,input_export_address_len)
                     self.SetControlValue(self._select_data,data_str)
 
