@@ -7,7 +7,7 @@ import ida_ida
 from ida_kernwin import add_hotkey
 from ida_bytes import get_flags
 
-VERSION = "1.4.1"
+VERSION = "1.4.2"
 
 
 # Notice: Since the selected value of IDA's self.DropdownListControl gets the index of the incoming List object,
@@ -735,7 +735,10 @@ class DataExportPlus(idaapi.plugin_t):
         selection, ea_addr, ea_addr_end = idaapi.read_range_selection(None)
 
         if (selection):
-            ea_item_size = ea_addr_end - ea_addr
+            if ea_addr <= ea_addr_end:
+                ea_item_size = ea_addr_end - ea_addr
+            else:
+                ea_item_size = ea_addr - ea_addr_end
         else:
             ea_addr = idc.get_screen_ea()
             ea_item_size = idc.get_item_size(idc.get_screen_ea())
