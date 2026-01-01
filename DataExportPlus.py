@@ -7,7 +7,7 @@ import ida_ida
 from ida_kernwin import add_hotkey
 from ida_bytes import get_flags
 
-VERSION = "1.4.2"
+VERSION = "1.4.3"
 
 
 # Notice: Since the selected value of IDA's self.DropdownListControl gets the index of the incoming List object,
@@ -342,7 +342,7 @@ class DEP_Form(idaapi.Form):
         self.export_pad_zero = False
 
         self.export_data = None
-        self.export_file_path = getcwd() + "\\export_results.txt"
+        self.export_file_path = path.join(getcwd(), "export_results.txt")
 
 
         data_type_flag = get_flags(self.export_address)
