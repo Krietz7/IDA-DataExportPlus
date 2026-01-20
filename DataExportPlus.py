@@ -7,7 +7,7 @@ import ida_ida
 from ida_kernwin import add_hotkey
 from ida_bytes import get_flags
 
-VERSION = "1.5.0"
+VERSION = "1.5.1"
 
 
 # Notice: Since the selected value of IDA's self.DropdownListControl gets the index of the incoming List object,
@@ -74,8 +74,8 @@ class DEP_Conversion():
                  signed = False,
                  pad_zero = False,
                  delimiter = " ",prefix = "",suffix = "",
-                 keep_comments = False,
-                 keep_names = False,
+                 keep_comments = True,
+                 keep_names = True,
                  ):
         self.address = address
         self.Data_base_list, self.Data_type_list, _ = self.get_list()
@@ -339,8 +339,8 @@ class DEP_Form(idaapi.Form):
         self.export_prefix = "0x"
         self.export_suffix = ""
         self.export_as_type_key = EXPORT_FORMAT_STRING_KEY
-        self.export_keep_comments = False
-        self.export_keep_names = False
+        self.export_keep_comments = True
+        self.export_keep_names = True
         self.export_pad_zero = False
 
         self.export_data = None
@@ -405,8 +405,8 @@ Export Plus: Export Data
                 "_delimiter": self.StringInput(value = self.export_delimiter,swidth = 30),
                 "_prefix": self.StringInput(value = self.export_prefix,swidth = 30),
                 "_suffix": self.StringInput(value = self.export_suffix,swidth = 30),
-                "_keep_comments": self.DropdownListControl(items = ["False", "True"]),
-                "_keep_names": self.DropdownListControl(items = ["False", "True"]),
+                "_keep_comments": self.DropdownListControl(items = ["False", "True"], selval = 1),
+                "_keep_names": self.DropdownListControl(items = ["False", "True"], selval = 1),
 
 
                 "_export_text": self.MultiLineTextControl(text = "",swidth = 48),
