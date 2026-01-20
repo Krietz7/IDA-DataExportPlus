@@ -418,8 +418,8 @@ class DEP_Form(idaapi.Form):
 
         super(DEP_Form, self).__init__(
             r'''STARTITEM 0
-                BUTTON YES* Export
-                Export Plus: Export Data
+BUTTON YES* Export
+Export Plus: Export Data
 
                 {FormChangeCb}
                 <Start Address    :{_address_start}>
@@ -490,6 +490,7 @@ class DEP_Form(idaapi.Form):
         return 1
 
     def _initalizate(self):
+        self.EnableField(self._select_data, False)
         self._update_address_fields(-1)
         self._update_export_settings()
         self._update_field_visibility()
@@ -497,7 +498,6 @@ class DEP_Form(idaapi.Form):
         self._set_controls_default_value()
 
     def _update_address_fields(self, fid):
-        self.EnableField(self._select_data, False)
         input_export_address_start = self.GetControlValue(self._address_start)
         input_export_address_end = self.GetControlValue(self._address_end)
         input_export_address_len = self.GetControlValue(self._length)
@@ -534,7 +534,7 @@ class DEP_Form(idaapi.Form):
                     return 1
 
             if(self.min_ea <= input_export_address_start and self.max_ea > input_export_address_start + input_export_address_len):
-                self.Data_bytes,data_str =self.GetEAData(input_export_address_start,input_export_address_len)
+                self.Data_bytes,data_str =self._get_ea_data(input_export_address_start,input_export_address_len)
                 self.SetControlValue(self._select_data,data_str)
 
                 self.export_address_start = input_export_address_start
