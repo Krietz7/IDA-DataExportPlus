@@ -8,12 +8,12 @@
 ## 使用方法
 使用快捷键`Shift+E`以唤出插件窗口
 
-![image1](https://github.com/user-attachments/assets/cad9ce0b-2680-4f1f-ad52-3053bd9a174d)
+<img width="2560" height="1444" alt="image" src="https://github.com/user-attachments/assets/3d100006-847c-40d9-af1f-629d93f9c0aa" />
 
 您可以在此窗口中更改导出数据的格式
 
-![image2](https://github.com/user-attachments/assets/618d52c0-575b-44a8-837d-2173814f5e30)
+<img width="2559" height="1408" alt="image" src="https://github.com/user-attachments/assets/ca58e48b-8b00-4afc-9839-8b4c9b00d4e3" />
 
 导出汇编代码
 
-![image3](https://github.com/user-attachments/assets/4ef63c52-6cdf-43e0-b885-d1cde70117ef)
+<img width="2475" height="1410" alt="image" src="https://github.com/user-attachments/assets/15d4bb43-2b9e-44d0-a9ad-b62f6d5fc841" />
