@@ -7,7 +7,7 @@ import ida_ida
 from ida_kernwin import add_hotkey
 from ida_bytes import get_flags
 
-VERSION = "1.4.3"
+VERSION = "1.5.0"
 
 
 # Notice: Since the selected value of IDA's self.DropdownListControl gets the index of the incoming List object,
@@ -64,7 +64,8 @@ class DEP_Conversion():
         return (Data_base_list,Data_type_list,Data_exported_format_list)
 
     # data(bytes) big_endian(Bool) data_type(int) base(int) delimiter(str) prefix(str) suffix(str)
-    def __init__(self, address,
+    def __init__(self,
+                 address,
                  data_bytes,
                  data_type_key = DATA_TYPE_BYTE_KEY,
                  export_as_type_key = EXPORT_FORMAT_STRING_KEY,
@@ -322,8 +323,9 @@ class DEP_Form(idaapi.Form):
     # list
     Data_base_list,Data_type_list,Data_exported_format_list = DEP_Conversion.get_list()
 
-    def __init__(self,select_addr,select_len):
-        self.export_address = select_addr
+    def __init__(self, select_addr_start, select_addr_end, select_len):
+        self.export_address_start = select_addr_start
+        self.export_address_end = select_addr_end
         self.export_address_len = select_len
         self.Data_bytes = b""
         self.export_data_type_key = DATA_TYPE_BYTE_KEY
@@ -345,7 +347,7 @@ class DEP_Form(idaapi.Form):
         self.export_file_path = path.join(getcwd(), "export_results.txt")
 
 
-        data_type_flag = get_flags(self.export_address)
+        data_type_flag = get_flags(self.export_address_start)
         checks = [
             (idc.is_byte, DATA_TYPE_BYTE_KEY),
             (idc.is_word, DATA_TYPE_WORD_KEY),
@@ -365,7 +367,8 @@ BUTTON YES* Export
 Export Plus: Export Data
 
             {FormChangeCb}
-            <Selected address :{_address}>
+            <Start Address    :{_address_start}>
+            <End Address      :{_address_end}>
             <Selected Length  :{_length}>
             <~Selected Data~    :{_select_data}>
             < Data Type       :{_data_type}>
@@ -388,7 +391,8 @@ Export Plus: Export Data
             {
                 "FormChangeCb": self.FormChangeCb(self.OnFormChange),
 
-                "_address": self.NumericInput(value = self.export_address, tp=self.FT_ADDR, swidth=30),
+                "_address_start": self.NumericInput(value = self.export_address_start, tp=self.FT_ADDR, swidth=30),
+                "_address_end": self.NumericInput(value = self.export_address_end, tp=self.FT_ADDR, swidth=30),
                 "_length": self.NumericInput(value = self.export_address_len, swidth = 30),
                 "_select_data": self.StringInput(value = "",swidth = 30),
                 "_data_type": self.DropdownListControl(items = list(self.Data_type_list.keys()), selval = self.export_data_type_key),
@@ -418,35 +422,63 @@ Export Plus: Export Data
         if(fid == -1):
             self.EnableField(self._select_data,False)
             try:
-                input_export_address = self.GetControlValue(self._address)
+                input_export_address_start = self.GetControlValue(self._address_start)
                 input_export_address_len = self.GetControlValue(self._length)
 
                 self.min_ea = ida_ida.inf_get_min_ea()
                 self.max_ea = ida_ida.inf_get_max_ea()
 
-                if(self.min_ea <= input_export_address and self.max_ea >= input_export_address and self.max_ea >= input_export_address + input_export_address_len):
-                    self.Data_bytes,data_str =self.GetEAData(input_export_address,input_export_address_len)
+                if(self.min_ea <= input_export_address_start and self.max_ea >= input_export_address_start and self.max_ea >= input_export_address_start + input_export_address_len):
+                    self.Data_bytes,data_str =self.GetEAData(input_export_address_start,input_export_address_len)
                     self.SetControlValue(self._select_data,data_str)
 
-                    self.export_address = input_export_address
+                    self.export_address_start = input_export_address_start
                     self.export_address_len = input_export_address_len
             except:
                 return 1
 
         # change Selected information
-        elif(fid == self._address.id or fid == self._length.id):
+        elif(fid in [self._address_start.id, self._address_end.id, self._length.id]):
+            input_export_address_start = self.GetControlValue(self._address_start)
+            input_export_address_end = self.GetControlValue(self._address_end)
+            input_export_address_len = self.GetControlValue(self._length)
+
+            self.min_ea = ida_ida.inf_get_min_ea()
+            self.max_ea = ida_ida.inf_get_max_ea()
+
             try:
-                input_export_address = self.GetControlValue(self._address)
-                input_export_address_len = self.GetControlValue(self._length)
+                if fid == self._address_start.id:
+                    if self.min_ea <= input_export_address_start and \
+                    self.max_ea >= input_export_address_start and \
+                    input_export_address_start < input_export_address_end:
+                            input_export_address_len = input_export_address_end - input_export_address_start
+                            self.SetControlValue(self._length, input_export_address_len)
+                    else:
+                        return 1
 
-                self.min_ea = ida_ida.inf_get_min_ea()
-                self.max_ea = ida_ida.inf_get_max_ea()
+                elif fid == self._address_end.id:
+                    if self.min_ea <= input_export_address_end and \
+                    self.max_ea >= input_export_address_end and \
+                    input_export_address_start < input_export_address_end:
+                            input_export_address_len = input_export_address_end - input_export_address_start
+                            self.SetControlValue(self._length, input_export_address_len)
+                    else:
+                        return 1
 
-                if(self.min_ea <= input_export_address and self.max_ea >= input_export_address and self.max_ea > input_export_address + input_export_address_len):
-                    self.Data_bytes,data_str =self.GetEAData(input_export_address,input_export_address_len)
+                elif fid == self._length.id:
+                    if self.min_ea <= input_export_address_start and \
+                    self.max_ea >= input_export_address_start and \
+                    input_export_address_start + input_export_address_len <= self.max_ea:
+                        input_export_address_end = input_export_address_start + input_export_address_len
+                        self.SetControlValue(self._address_end, input_export_address_end)
+                    else:
+                        return 1
+
+                if(self.min_ea <= input_export_address_start and self.max_ea > input_export_address_start + input_export_address_len):
+                    self.Data_bytes,data_str =self.GetEAData(input_export_address_start,input_export_address_len)
                     self.SetControlValue(self._select_data,data_str)
 
-                    self.export_address = input_export_address
+                    self.export_address_start = input_export_address_start
                     self.export_address_len = input_export_address_len
             except:
                 return 1
@@ -613,7 +645,7 @@ Export Plus: Export Data
 
 
     def RefreshExportWindow(self):
-        t = DEP_Conversion(address = self.export_address,
+        t = DEP_Conversion(address = self.export_address_start,
                            data_bytes = self.Data_bytes,
                            data_type_key = self.export_data_type_key,
                            export_as_type_key = self.export_as_type_key,
@@ -703,8 +735,8 @@ class DataExportPlus(idaapi.plugin_t):
         self.run(None)
 
     def run(self, args):
-        ea_addr,ea_item_size = self.GetEAItem()
-        form = DEP_Form(ea_addr,ea_item_size)
+        ea_addr_start, ea_addr_end, ea_item_size = self.GetEAItem()
+        form = DEP_Form(ea_addr_start, ea_addr_end, ea_item_size)
         IsExport = form.Execute()
 
 
@@ -732,18 +764,19 @@ class DataExportPlus(idaapi.plugin_t):
 
 
     def GetEAItem(self):
-        selection, ea_addr, ea_addr_end = idaapi.read_range_selection(None)
+        selection, ea_addr_start, ea_addr_end = idaapi.read_range_selection(None)
 
         if (selection):
-            if ea_addr <= ea_addr_end:
-                ea_item_size = ea_addr_end - ea_addr
+            if ea_addr_start <= ea_addr_end:
+                ea_item_size = ea_addr_end - ea_addr_start
             else:
-                ea_item_size = ea_addr - ea_addr_end
+                ea_item_size = ea_addr_start - ea_addr_end
         else:
-            ea_addr = idc.get_screen_ea()
+            ea_addr_start = idc.get_screen_ea()
             ea_item_size = idc.get_item_size(idc.get_screen_ea())
+            ea_addr_end = ea_addr_start + ea_item_size
 
-        return ea_addr,ea_item_size
+        return ea_addr_start, ea_addr_end, ea_item_size
 
 
 
