@@ -121,13 +121,13 @@ class DEP_Conversion:
     def _get_conversion_output(self):
         if self.data_type_key in [DATA_TYPE_BYTE_KEY, DATA_TYPE_WORD_KEY,
                                  DATA_TYPE_DWORD_KEY, DATA_TYPE_QWORD_KEY]:
-            return self.NumberConversion()
+            return self._number_conversion()
         elif self.data_type_key in [DATA_TYPE_FLOAT_KEY, DATA_TYPE_DOUBLE_KEY]:
-            return self.FloatConversion()
+            return self._float_conversion()
         elif self.data_type_key == DATA_TYPE_STRING_LITERAL_KEY:
-            return self.StringLiteralConversion()
+            return self._string_literal_conversion()
         elif self.data_type_key == DATA_TYPE_ASSEMBLY_CODE_KEY:
-            return self.AssemblyCodeConversion()
+            return self.assembly_code_conversion()
         return None
 
     def _format_c_variable(self, output):
@@ -227,7 +227,7 @@ class DEP_Conversion:
 
     # base on Byte/Word/Dword/Qword convert byte stream to number
     # parameter: base big_endian sign prefix suffix delimiter
-    def NumberConversion(self):
+    def _number_conversion(self):
         type_len_list = {DATA_TYPE_BYTE_KEY:1, DATA_TYPE_WORD_KEY:2,
                         DATA_TYPE_DWORD_KEY:4, DATA_TYPE_QWORD_KEY:8}
         Number_len = type_len_list[self.data_type_key]
@@ -277,7 +277,7 @@ class DEP_Conversion:
             return self.delimiter.join(format_number(i) for i in number_bytes_array)
         return None
 
-    def FloatConversion(self):
+    def _float_conversion(self):
         type_len_list = {DATA_TYPE_FLOAT_KEY:4, DATA_TYPE_DOUBLE_KEY:8}
         Number_len = type_len_list[self.data_type_key]
         number_bytes_array = []
@@ -298,10 +298,10 @@ class DEP_Conversion:
 
         return self.delimiter.join(f"{self.prefix}{i}{self.suffix}" for i in float_values)
 
-    def StringLiteralConversion(self):
+    def _string_literal_conversion(self):
         return str(self.data_bytes)[2:-1]
 
-    def AssemblyCodeConversion(self):
+    def assembly_code_conversion(self):
         assembly_code_start = self.address
         assembly_code_end = self.address + len(self.data_bytes)
 
@@ -471,14 +471,14 @@ class DEP_Form(idaapi.Form):
 
     def OnFormChange(self, fid):
         if fid == -1:
-            self._update_address_fields(-1)
+            self._initalizate()
         elif fid in [self._address_start.id, self._address_end.id, self._length.id]:
             self._update_address_fields(fid)
-        elif fid in [-1, self._data_type.id, self._export_type.id, self._signed.id]:
+        elif fid in [self._data_type.id, self._export_type.id, self._signed.id]:
             self._update_export_settings()
             self._update_field_visibility()
             self._update_field_availability()
-            self.SetControlsDefaultValue()
+            self._set_controls_default_value()
         elif fid in [self._endianness.id, self._base.id, self._signed.id, self._pad_zero.id,
                      self._delimiter.id, self._prefix.id, self._suffix.id,
                      self._keep_comments.id, self._keep_names.id]:
@@ -486,8 +486,15 @@ class DEP_Form(idaapi.Form):
         elif fid == self._export_file_path.id:
             self.export_file_path = self.GetControlValue(self._export_file_path)
 
-        self.RefreshExportWindow()
+        self._refresh_export_window()
         return 1
+
+    def _initalizate(self):
+        self._update_address_fields(-1)
+        self._update_export_settings()
+        self._update_field_visibility()
+        self._update_field_availability()
+        self._set_controls_default_value()
 
     def _update_address_fields(self, fid):
         self.EnableField(self._select_data, False)
@@ -569,14 +576,14 @@ class DEP_Form(idaapi.Form):
         self.export_keep_names = {0: False, 1: True}[self.GetControlValue(self._keep_names)]
 
         if fid in [self._base.id, self._signed.id]:
-            self.SetControlsDefaultValue()
+            self._set_controls_default_value()
 
-    def GetEAData(self, address, length):
+    def _get_ea_data(self, address, length):
         data_byte = idc.get_bytes(address, length)
         data_str = ' '.join([f"{i:02X}" for i in bytearray(data_byte)])
         return data_byte, data_str.strip()
 
-    def RefreshExportWindow(self):
+    def _refresh_export_window(self):
         t = DEP_Conversion(
             address=self.export_address_start, data_bytes=self.Data_bytes,
             data_type_key=self.export_data_type_key, export_as_type_key=self.export_as_type_key,
@@ -589,12 +596,12 @@ class DEP_Form(idaapi.Form):
         self.SetControlValue(self._export_text, idaapi.textctrl_info_t(
             text=self.export_data, flags=32, tabsize=0))
 
-    def SetControlsDefaultValue(self):
-        self.__SetDefaultPrefixValue()
-        self.__SetDefaultDelimiterValue()
-        self.__SetDefaultSuffixValue()
+    def _set_controls_default_value(self):
+        self._set_default_prefix_value()
+        self._set_default_delimiter_value()
+        self._set_default_suffix_value()
 
-    def __SetDefaultPrefixValue(self):
+    def _set_default_prefix_value(self):
         if self.export_data_type_key in [DATA_TYPE_BYTE_KEY, DATA_TYPE_WORD_KEY,
                                         DATA_TYPE_DWORD_KEY, DATA_TYPE_QWORD_KEY]:
             Prefix_list = {DATA_BASE_HEX_KEY: "0x", DATA_BASE_DEC_KEY: "",
@@ -610,14 +617,14 @@ class DEP_Form(idaapi.Form):
 
         self.SetControlValue(self._prefix, self.export_prefix)
 
-    def __SetDefaultDelimiterValue(self):
+    def _set_default_delimiter_value(self):
         if self.export_data_type_key in [DATA_TYPE_BYTE_KEY, DATA_TYPE_WORD_KEY,
                                         DATA_TYPE_DWORD_KEY, DATA_TYPE_QWORD_KEY,
                                         DATA_TYPE_FLOAT_KEY, DATA_TYPE_DOUBLE_KEY]:
             self.export_delimiter = ", "
         self.SetControlValue(self._delimiter, self.export_delimiter)
 
-    def __SetDefaultSuffixValue(self):
+    def _set_default_suffix_value(self):
         self.export_suffix = ""
 
         if self.export_as_type_key == EXPORT_FORMAT_C_VARIABLE_KEY:
