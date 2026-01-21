@@ -6,7 +6,7 @@ import ida_ida
 from ida_kernwin import add_hotkey
 from ida_bytes import get_flags
 
-VERSION = "1.5.1"
+VERSION = "1.5.2"
 
 # Notice: Since the selected value of IDA's self.DropdownListControl gets the index of the incoming List object,
 # the constant definition of key values also needs to follow the 0-index
@@ -506,40 +506,30 @@ Export Plus: Export Data
         self.max_ea = ida_ida.inf_get_max_ea()
 
         try:
-            if fid == self._address_start.id:
-                if self.min_ea <= input_export_address_start and \
-                self.max_ea >= input_export_address_start and \
-                input_export_address_start < input_export_address_end:
-                        input_export_address_len = input_export_address_end - input_export_address_start
-                        self.SetControlValue(self._length, input_export_address_len)
-                else:
+            if fid in (self._address_start.id, self._address_end.id):
+                if not (self.min_ea <= input_export_address_start <= self.max_ea and
+                        self.min_ea <= input_export_address_end <= self.max_ea):
                     return 1
-
-            elif fid == self._address_end.id:
-                if self.min_ea <= input_export_address_end and \
-                self.max_ea >= input_export_address_end and \
-                input_export_address_start < input_export_address_end:
-                        input_export_address_len = input_export_address_end - input_export_address_start
-                        self.SetControlValue(self._length, input_export_address_len)
-                else:
+                if input_export_address_start >= input_export_address_end:
                     return 1
+                input_export_address_len = input_export_address_end - input_export_address_start
+                self.SetControlValue(self._length, input_export_address_len)
 
             elif fid == self._length.id:
-                if self.min_ea <= input_export_address_start and \
-                self.max_ea >= input_export_address_start and \
-                input_export_address_start + input_export_address_len <= self.max_ea:
-                    input_export_address_end = input_export_address_start + input_export_address_len
-                    self.SetControlValue(self._address_end, input_export_address_end)
-                else:
+                if not (self.min_ea <= input_export_address_start <= self.max_ea and
+                        input_export_address_start + input_export_address_len <= self.max_ea):
                     return 1
+                input_export_address_end = input_export_address_start + input_export_address_len
+                self.SetControlValue(self._address_end, input_export_address_end)
 
-            if(self.min_ea <= input_export_address_start and self.max_ea > input_export_address_start + input_export_address_len):
-                self.Data_bytes,data_str =self._get_ea_data(input_export_address_start,input_export_address_len)
-                self.SetControlValue(self._select_data,data_str)
+            if (self.min_ea <= input_export_address_start and
+                    self.max_ea > input_export_address_start + input_export_address_len):
+                self.Data_bytes, data_str = self._get_ea_data(input_export_address_start, input_export_address_len)
+                self.SetControlValue(self._select_data, data_str)
 
                 self.export_address_start = input_export_address_start
                 self.export_address_len = input_export_address_len
-        except:
+        except TypeError:
             return 1
 
     def _update_export_settings(self):
