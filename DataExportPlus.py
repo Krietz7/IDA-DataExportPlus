@@ -6,7 +6,7 @@ import ida_ida
 from ida_kernwin import add_hotkey
 from ida_bytes import get_flags
 
-VERSION = "1.5.2"
+VERSION = "1.5.3"
 
 # Notice: Since the selected value of IDA's self.DropdownListControl gets the index of the incoming List object,
 # the constant definition of key values also needs to follow the 0-index
@@ -166,7 +166,7 @@ class DEP_Conversion:
 
         elif self.data_type_key == DATA_TYPE_STRING_LITERAL_KEY:
             py_literal = self._bytes_to_py_literal(self.data_bytes)
-            return f"{var_name} = b'{py_literal}'"
+            return f"{var_name} = {py_literal}"
 
         elif self.data_type_key == DATA_TYPE_ASSEMBLY_CODE_KEY:
             return f"{var_name} = '''{output}'''"
@@ -206,24 +206,8 @@ class DEP_Conversion:
 
         return ''.join(result)
 
-    def _bytes_to_py_literal(self, data):
-        result = []
-        for byte in data:
-            if byte == 39:  # '
-                result.append("\\'")
-            elif byte == 92:  # \\
-                result.append("\\\\")
-            elif byte == ord('\n'):
-                result.append("\\n")
-            elif byte == ord('\r'):
-                result.append("\\r")
-            elif byte == ord('\t'):
-                result.append("\\t")
-            elif 32 <= byte <= 126:
-                result.append(chr(byte))
-            else:
-                result.append(f"\\x{byte:02X}")
-        return ''.join(result)
+    def _bytes_to_py_literal(self, data_bytes):
+        return repr(data_bytes)
 
     # base on Byte/Word/Dword/Qword convert byte stream to number
     # parameter: base big_endian sign prefix suffix delimiter
